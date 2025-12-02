@@ -21,7 +21,7 @@
 ```
 [lfs "test-repo"]
     enabled = true
-    maxObjectSize = 500m
+    maxObjectSize = 1g
 ```
 
 ### 3. test-repo
