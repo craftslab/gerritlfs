@@ -117,15 +117,40 @@ This guide uses MinIO as an S3-compatible backend for Gerrit LFS. MinIO is a hig
 
 ### Deploy MinIO
 
-Run MinIO using the `craftslab/minio:latest` Docker image:
+#### Using Docker Compose (Recommended)
+
+Deploy MinIO using Docker Compose with the provided `docker-compose.yml`:
+
+```bash
+# Start MinIO
+docker-compose up -d
+
+# View logs
+docker-compose logs -f
+
+# Stop MinIO
+docker-compose down
+```
+
+The `docker-compose.yml` file uses:
+- Image: `craftslab/minio:latest`
+- Bind mount: `./data:/data` (or customize to `/path/to/minio/data:/data`)
+- Ports: `9000` (S3 API) and `9001` (Console)
+- Default credentials: `minioadmin` / `minioadmin`
+
+For the complete configuration, see [minio/docker-compose.yml](https://github.com/craftslab/minio/blob/master/docker-compose.yml).
+
+#### Using Docker Run
+
+Alternatively, run MinIO using the `craftslab/minio:latest` Docker image directly:
 
 ```bash
 docker run -d \
   --name minio \
   -p 9000:9000 \
   -p 9001:9001 \
-  -v /path/to/minio/data:/tmp/minio \
-  craftslab/minio:latest server /tmp/minio --console-address :9001
+  -v /path/to/minio/data:/data \
+  craftslab/minio:latest server /data --console-address :9001
 ```
 
 **Credentials:**
