@@ -48,10 +48,9 @@ RUN useradd -m -s /bin/bash builder \
 RUN git clone https://gerrit.googlesource.com/gerrit -b stable-3.2 \
     && chown -R builder:builder /workspace/gerrit
 
-# Clone LFS plugin
-RUN cd gerrit && \
-    git clone https://gerrit.googlesource.com/plugins/lfs -b stable-3.2 plugins/lfs \
-    && chown -R builder:builder /workspace/gerrit
+# Copy plugin source
+COPY lfs /workspace/gerrit/plugins/lfs
+RUN chown -R builder:builder /workspace/gerrit
 
 # Initialize Gerrit submodules
 RUN git config --global --add safe.directory '*' \
