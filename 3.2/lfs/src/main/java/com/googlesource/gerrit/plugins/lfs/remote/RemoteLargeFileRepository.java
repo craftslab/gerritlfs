@@ -160,8 +160,7 @@ public class RemoteLargeFileRepository implements LargeFileRepository {
     // Return action pointing to remote LFS server
     // The href will be constructed by the LFS protocol handler based on the remote URL
     String downloadUrl = buildObjectUrl(id);
-    Response.Action action = new Response.Action();
-    action.href = downloadUrl;
+    Response.Action action = new Response.Action(downloadUrl);
     return action;
   }
 
@@ -169,26 +168,9 @@ public class RemoteLargeFileRepository implements LargeFileRepository {
   public Response.Action getUploadAction(AnyLongObjectId id, long size) {
     // Return action pointing to remote LFS server
     String uploadUrl = buildObjectUrl(id);
-    Response.Action action = new Response.Action();
-    action.href = uploadUrl;
+    Response.Action action = new Response.Action(uploadUrl);
+    action.size = size;
     return action;
-  }
-
-  @Override
-  public Response.Action getVerifyAction(AnyLongObjectId id) {
-    // Return action pointing to remote LFS server for verification
-    // Verification checks if the object exists on the remote server
-    String verifyUrl = buildObjectUrl(id);
-    Response.Action action = new Response.Action();
-    action.href = verifyUrl;
-    return action;
-  }
-
-  @Override
-  public long getSize(AnyLongObjectId id) {
-    // For remote storage, we cannot determine the size without querying the remote server
-    // Return -1 to indicate size is unknown (the remote server will handle size validation)
-    return -1;
   }
 
   private String buildObjectUrl(AnyLongObjectId id) {

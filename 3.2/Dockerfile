@@ -74,7 +74,6 @@ RUN java -version \
     && echo "build --java_language_version=11" >> .bazelrc \
     && echo "build --java_runtime_version=11" >> .bazelrc \
     && echo "build --tool_java_language_version=11" >> .bazelrc \
-    && echo "build --copt=-Wno-stringop-overflow" >> .bazelrc \
     && python3 -c "import re; content = open('WORKSPACE', 'r').read(); content = re.sub(r'(rbe_autoconfig\s*\()', r'\1use_checked_in_confs = \"Force\", ', content); open('WORKSPACE', 'w').write(content)" \
     && bazel sync --configure 2>&1 | tee /tmp/sync.log || (echo "Sync had errors, but continuing..." && tail -20 /tmp/sync.log) \
     && bazel build --verbose_failures plugins/lfs
