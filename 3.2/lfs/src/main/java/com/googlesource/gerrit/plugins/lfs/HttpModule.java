@@ -25,14 +25,12 @@ import com.google.inject.servlet.ServletModule;
 import com.googlesource.gerrit.plugins.lfs.fs.LfsFsContentServlet;
 import com.googlesource.gerrit.plugins.lfs.fs.LocalLargeFileRepository;
 import com.googlesource.gerrit.plugins.lfs.locks.LfsLocksServlet;
-import com.googlesource.gerrit.plugins.lfs.remote.RemoteLargeFileRepository;
 import com.googlesource.gerrit.plugins.lfs.s3.S3LargeFileRepository;
 import java.util.Map;
 
 public class HttpModule extends ServletModule {
   private final LocalLargeFileRepository.Factory fsRepoFactory;
   private final S3LargeFileRepository.Factory s3RepoFactory;
-  private final RemoteLargeFileRepository.Factory remoteRepoFactory;
   private final LfsRepositoriesCache cache;
   private final LfsFsContentServlet.Factory fsServletFactory;
   private final LfsBackend defaultBackend;
@@ -42,13 +40,11 @@ public class HttpModule extends ServletModule {
   HttpModule(
       LocalLargeFileRepository.Factory fsRepoFactory,
       S3LargeFileRepository.Factory s3RepoFactory,
-      RemoteLargeFileRepository.Factory remoteRepoFactory,
       LfsRepositoriesCache cache,
       LfsFsContentServlet.Factory fsServletFactory,
       LfsConfigurationFactory configFactory) {
     this.fsRepoFactory = fsRepoFactory;
     this.s3RepoFactory = s3RepoFactory;
-    this.remoteRepoFactory = remoteRepoFactory;
     this.cache = cache;
     this.fsServletFactory = fsServletFactory;
 
@@ -79,10 +75,6 @@ public class HttpModule extends ServletModule {
         populateS3Repository(backend);
         break;
 
-      case REMOTE:
-        populateRemoteRepository(backend);
-        break;
-
       default:
         throw new IllegalArgumentException(
             String.format("Unknown repository type: %s", backend.type));
@@ -91,11 +83,6 @@ public class HttpModule extends ServletModule {
 
   private void populateS3Repository(LfsBackend backend) {
     S3LargeFileRepository repository = s3RepoFactory.create(backend);
-    cache.put(backend, repository);
-  }
-
-  private void populateRemoteRepository(LfsBackend backend) {
-    RemoteLargeFileRepository repository = remoteRepoFactory.create(backend);
     cache.put(backend, repository);
   }
 

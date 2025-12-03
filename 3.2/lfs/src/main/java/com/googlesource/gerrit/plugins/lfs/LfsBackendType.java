@@ -19,8 +19,5 @@ public enum LfsBackendType {
   FS,
 
   /** S3. */
-  S3,
-
-  /** Remote LFS server. */
-  REMOTE
+  S3
 }

@@ -23,7 +23,6 @@ import com.google.inject.internal.UniqueAnnotations;
 import com.googlesource.gerrit.plugins.lfs.fs.LfsFsContentServlet;
 import com.googlesource.gerrit.plugins.lfs.fs.LocalLargeFileRepository;
 import com.googlesource.gerrit.plugins.lfs.locks.LfsLocksModule;
-import com.googlesource.gerrit.plugins.lfs.remote.RemoteLargeFileRepository;
 import com.googlesource.gerrit.plugins.lfs.s3.S3LargeFileRepository;
 
 public class Module extends FactoryModule {
@@ -44,7 +43,6 @@ public class Module extends FactoryModule {
 
     factory(S3LargeFileRepository.Factory.class);
     factory(LocalLargeFileRepository.Factory.class);
-    factory(RemoteLargeFileRepository.Factory.class);
     factory(LfsFsContentServlet.Factory.class);
     install(new LfsLocksModule());
   }

@@ -84,16 +84,9 @@ If not set, defaults to `false`.
 
 lfs.backend
 : Backend that should be used for storing binaries. It has to be one of
-backends specified as [fs](#lfs-fs-backend), [s3](#lfs-s3-backend), or
-[remote](#lfs-remote-backend) subsection of Global Plugin Settings. If not set,
-defaults to value of `storage.backend` from Global Plugin Settings.
-
-For remote backends, you can use:
-- `backend = remote` - Automatically selects between HTTP and SSH remote backends based on available backends
-- `backend = remote:http` - Explicitly use HTTP/HTTPS remote backend
-- `backend = remote:ssh` - Explicitly use SSH remote backend
-- `backend = http-backend` - Use a specific named backend (e.g., `http-backend`)
-- `backend = ssh-backend` - Use a specific named backend (e.g., `ssh-backend`)
+backends specified as [fs](#lfs-fs-backend) or [s3](#lfs-s3-backend) subsection
+of Global Plugin Settings. If not set, defaults to value of `storage.backend`
+from Global Plugin Settings.
 
 ## Global Plugin Settings
 
@@ -139,7 +132,7 @@ provides token that is later used for Git LFS requests.
 
 storage.backend
 : The default storage backend to use. Valid values are `fs` for local file system,
-`s3` for Amazon S3, and `remote` for remote LFS server. If not set, defaults to `fs`.
+and `s3` for Amazon S3. If not set, defaults to `fs`.
 
 ### <a id="lfs-fs-backend"></a>Section `fs` - default file system backend
 
@@ -202,71 +195,9 @@ s3.secretKey
  for authenticating to S3. It is recommended to place this
 setting in `$GERRIT_SITE/etc/@PLUGIN@.secure.config`.
 
-### <a id="lfs-remote-backend"></a>Section `remote` - remote LFS server backend
-
-The following configuration options are only used when the backend is `remote`.
-
-remote.url
-: Base URL of the remote LFS server. For HTTP/HTTPS, use format like
-`https://lfs-server.example.com`. For SSH, use format like
-`ssh://user@host:port/path`. The remote server must implement the
-[Git LFS Batch API](https://github.com/git-lfs/git-lfs/blob/master/docs/api/batch.md).
-The plugin will construct object URLs by appending `/objects/<oid>` to this base URL.
-
-remote.username
-: Optional username for authenticating to the remote LFS server (HTTP/HTTPS only).
-If not specified, no authentication is used.
-
-remote.password
-: Optional password for authenticating to the remote LFS server (HTTP/HTTPS only).
-It is recommended to place this setting in `$GERRIT_SITE/etc/@PLUGIN@.secure.config`.
-
-remote.disableSslVerify
-: `true`: SSL verification is disabled (HTTP/HTTPS only)
-: `false`: SSL verification is enabled
-: Default is `false`.
-
-remote.sshHost
-: SSH hostname or IP address for SSH-based remote storage. If specified, the
-backend will use SSH instead of HTTP/HTTPS. Can be used instead of or in
-combination with `remote.url` starting with `ssh://`.
-
-remote.sshPort
-: SSH port number. Default is `22`.
-
-remote.sshUser
-: SSH username for authenticating to the remote server. If not specified in
-`remote.url` or `remote.sshUser`, the system user will be used.
-
-remote.sshKeyFile
-: Path to the SSH private key file for authentication. If not specified, the
-default SSH keys (`~/.ssh/id_rsa`, `~/.ssh/id_dsa`, etc.) will be used.
-
-remote.sshKeyPassphrase
-: Passphrase for the SSH private key file. It is recommended to place this
-setting in `$GERRIT_SITE/etc/@PLUGIN@.secure.config`.
-
-Example: Configure remote storage with SSH:
-
-```
-  [remote "ssh-storage"]
-    sshHost = lfs-server.example.com
-    sshPort = 22
-    sshUser = git
-    sshKeyFile = /etc/gerrit/ssh/lfs_key
-```
-
-Or using SSH URL format:
-
-```
-  [remote "ssh-storage"]
-    url = ssh://git@lfs-server.example.com:22
-    sshKeyFile = /etc/gerrit/ssh/lfs_key
-```
-
 ### Multiple LFS backends
 
-One can specify multiple LFS backends for FS, S3, and remote storage by introducing
+One can specify multiple LFS backends for both FS and S3 storage by introducing
 backend subsections:
 
 ```
@@ -274,15 +205,6 @@ backend subsections:
     directory = /foo_dir
   [s3 "bar"]
     ...
-  [remote "baz"]
-    url = https://remote-lfs-server.example.com/objects/batch
-    username = myuser
-    password = mypass
-  [remote "ssh-backend"]
-    sshHost = lfs-server.example.com
-    sshPort = 22
-    sshUser = git
-    sshKeyFile = /path/to/private/key
 ```
 
 and use them for namespace configuration by adding backend namespace parameter:
@@ -293,9 +215,6 @@ and use them for namespace configuration by adding backend namespace parameter:
     ...
   [@PLUGIN@ "release/*"]
     backend = bar
-    ...
-  [@PLUGIN@ "external/*"]
-    backend = baz
     ...
 ```
 
