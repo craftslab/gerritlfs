@@ -185,10 +185,12 @@ Check the Gerrit logs or web interface to confirm the LFS plugin is loaded. You 
 ```
 
 **MinIO Configuration Options**
-- `s3.hostname`: Use `localhost:9000` for local MinIO deployment, or the actual hostname/IP if MinIO is on a different host
+- `s3.hostname`: Use `hostname:port` or `ip:port` format
+  - **Important:** Do NOT include `http://` or `https://` protocol prefix
+  - The AWS S3 SDK defaults to HTTPS, so ensure MinIO is configured with HTTPS (see [Generate SSL Certificates](#generate-ssl-certificates))
 - `s3.region`: Can be any value (e.g., `us-east-1`) as MinIO is S3-compatible but doesn't enforce AWS regions
 - `s3.bucket`: Must match the bucket name created in MinIO
-- `s3.disableSslVerify`: Set to `true` for local MinIO deployments without SSL certificates
+- `s3.disableSslVerify`: Set to `true` when using self-signed certificates or for testing
 
 **S3 Configuration Options**
 - `s3.hostname`: Custom hostname for S3 API server
@@ -204,25 +206,31 @@ Check the Gerrit logs or web interface to confirm the LFS plugin is loaded. You 
 
 ### 3. All-Projects/refs/meta/config/lfs.config
 
-**Enable LFS for all projects using MinIO S3 backend:**
+**Enable LFS for specific project and all projects using MinIO S3 backend:**
 
 ```
-[lfs "?/*"]
+[lfs "project-name"]
+    enabled = true
+    maxObjectSize = 1g
+    backend = minio
+[lfs "^.*$"]
     enabled = true
     maxObjectSize = 1g
     backend = minio
 ```
 
 **Configuration Options:**
-- `[lfs "?/*"]`: Pattern to enable LFS for all projects. You can also use:
-  - `[lfs "project-name"]` for a specific project
-  - `[lfs "namespace/*"]` for projects under a namespace
-  - `[lfs "test-repo"]` for a single project (example)
+- `[lfs "project-name"]`: Specific project entry for top-level projects (projects without namespaces)
+- `[lfs "^.*$"]`: Regex pattern to enable LFS for all projects (including top-level and namespaced)
 - `enabled = true`: Enable LFS for matching projects
 - `maxObjectSize = 1g`: Maximum object size (supports k, m, g suffixes)
 - `backend = minio`: Use the MinIO S3 backend defined in global config. If not specified, defaults to filesystem backend (`fs`)
 
 **Note:** The `backend = minio` setting ensures LFS objects are stored in your MinIO S3 bucket instead of the local filesystem. The backend name (`minio`) must match the section name in your global `lfs.config` file (e.g., `[s3 "minio"]`).
+
+**Pattern Matching Priority:**
+- If a project name matches several LFS namespaces, the one defined first in the config will be applied
+- Specific project entries (e.g., `[lfs "project-name"]`) should be placed before pattern entries (e.g., `[lfs "^.*$"]`) for clarity
 
 ## Storage
 
@@ -248,8 +256,11 @@ docker-compose down
 The `docker-compose.yml` file uses:
 - Image: `craftslab/minio:latest`
 - Bind mount: `./data:/data` (or customize to `/path/to/minio/data:/data`)
+- Certificate mount: `./certs:/root/.minio/certs` (for HTTPS support)
 - Ports: `9000` (S3 API) and `9001` (Console)
 - Default credentials: `minioadmin` / `minioadmin`
+
+**Important:** The certificate volume mount (`./certs:/root/.minio/certs`) is required for HTTPS support, which is necessary because the AWS S3 SDK (used by Gerrit LFS) defaults to HTTPS connections.
 
 For the complete configuration, see [minio/docker-compose.yml](https://github.com/craftslab/minio/blob/master/docker-compose.yml).
 
@@ -271,8 +282,64 @@ docker run -d \
 - Secret Key: `minioadmin`
 
 **Ports:**
-- `9000`: S3 API endpoint (used by Gerrit LFS)
+- `9000`: S3 API endpoint (used by Gerrit LFS) - supports both HTTP and HTTPS
 - `9001`: MinIO Console (web-based object browser)
+
+### Generate SSL Certificates
+
+**Required for HTTPS:** Since the AWS S3 SDK (used by Gerrit LFS) defaults to HTTPS, MinIO must be configured with SSL certificates.
+
+#### For Testing (Self-Signed Certificates)
+
+1. **Create certificates directory:**
+   ```bash
+   cd /path/to/minio
+   mkdir -p certs
+   ```
+
+2. **Generate self-signed certificate:**
+   ```bash
+   cd certs
+   openssl req -new -newkey rsa:2048 -days 365 -nodes -x509 \
+     -keyout private.key \
+     -out public.pem \
+     -subj "/C=US/ST=State/L=City/O=Organization/CN=YOUR_HOSTNAME_OR_IP"
+
+   # Set proper permissions
+   chmod 600 private.key
+   chmod 644 public.pem
+   ```
+
+   **Replace `YOUR_HOSTNAME_OR_IP`** with your MinIO server's hostname or IP address.
+
+3. **Verify certificate files:**
+   ```bash
+   ls -la certs/
+   # Should show:
+   # - private.key (private key file)
+   # - public.pem (certificate file)
+   ```
+
+4. **Restart MinIO:**
+   ```bash
+   docker-compose down
+   docker-compose up -d
+   ```
+
+5. **Verify HTTPS is working:**
+   ```bash
+   # Test HTTPS endpoint
+   curl -k https://YOUR_HOSTNAME_OR_IP:9000/minio/health/live
+
+   # Check MinIO logs
+   docker-compose logs minio | grep -i "certificate\|https\|ssl"
+   ```
+
+**For Production:** Use proper SSL certificates from a Certificate Authority (CA) instead of self-signed certificates.
+
+**Note:** MinIO automatically detects and uses certificates placed in `/root/.minio/certs` directory:
+- `public.pem` (or `public.crt`) for the certificate
+- `private.key` for the private key
 
 ### Create Credentials
 
@@ -332,6 +399,45 @@ git push origin HEAD:refs/for/master
 # The file should be accessible on S3 server (check MinIO Console at http://localhost:9001)
 git lfs ls-files
 ```
+
+## Troubleshooting
+
+### Check LFS Logs
+
+If you encounter issues with LFS operations, check the Git LFS logs:
+
+```bash
+# View the last LFS operation log
+git lfs logs last
+
+# View all LFS logs
+git lfs logs
+
+# View specific log file
+cat .git/lfs/logs/YYYYMMDDTHHMMSS.XXXXXXXX.log
+```
+
+### Common Issues
+
+1. **"LFS is not available for repository"**
+   - Ensure the project is configured in `All-Projects/refs/meta/config/lfs.config`
+   - For top-level projects, use specific project name (e.g., `[lfs "project-name"]`)
+   - For all projects, use regex pattern `[lfs "^.*$"]`
+
+2. **SSL/HTTPS Connection Errors**
+   - Ensure MinIO is configured with SSL certificates (see [Generate SSL Certificates](#generate-ssl-certificates))
+   - Verify `disableSslVerify = true` in `lfs.config` when using self-signed certificates
+   - Check that hostname in `lfs.config` does NOT include `http://` or `https://` prefix
+
+3. **Empty MinIO Bucket**
+   - Verify files are tracked by Git LFS: `git lfs ls-files`
+   - Check that `.gitattributes` exists and tracks the file types you're using
+   - Ensure LFS files are actually being pushed (not just regular git files)
+
+4. **Connection Refused or Unknown Host**
+   - Verify MinIO is running: `docker-compose ps`
+   - Test connectivity: `curl -k https://YOUR_HOSTNAME:9000/minio/health/live`
+   - Check firewall rules and network connectivity between Gerrit and MinIO servers
 
 ## Reference
 
