@@ -5,6 +5,140 @@
 - [2.13](https://github.com/craftslab/gerritlfs/tree/main/2.13) - Gerrit 2.13 version build files
 - [3.2](https://github.com/craftslab/gerritlfs/tree/main/3.2) - Gerrit 3.2 version build files
 
+## Prerequisites
+
+### Install Git LFS
+
+Git LFS must be installed before using this plugin. If you encounter the error:
+```
+fatal: 'lfs' appears to be a git command, but we were not able to execute it. Maybe git-lfs is broken?
+```
+
+Install Git LFS on Ubuntu using one of the following methods:
+
+**Option 1: Using apt (Recommended for Ubuntu 24.04)**
+
+```bash
+# Update package list
+sudo apt update
+
+# Install git-lfs
+sudo apt install git-lfs
+
+# Initialize Git LFS
+git lfs install
+```
+
+**Option 2: Using the official Git LFS repository**
+
+```bash
+# Add the Git LFS repository
+curl -s https://packagecloud.io/install/repositories/github/git-lfs/script.deb.sh | sudo bash
+
+# Install git-lfs
+sudo apt install git-lfs
+
+# Initialize Git LFS
+git lfs install
+```
+
+After installation, verify it works:
+
+```bash
+git lfs version
+```
+
+You should see output like `git-lfs/3.x.x`.
+
+**Note:** The `git lfs install` command sets up Git LFS hooks in your Git configuration. You only need to run it once per user account.
+
+## Installation
+
+### Build the LFS Plugin
+
+The LFS plugin must be built and installed on your Gerrit server before it can be used. Choose the build method based on your Gerrit version:
+
+#### For Gerrit 3.2
+
+1. **Build the plugin using Docker:**
+
+```bash
+cd 3.2
+./build.sh
+```
+
+This will create a Docker image `gerrit-plugins-lfs:3.2` containing the built plugin.
+
+2. **Extract the lfs.jar from the Docker container:**
+
+```bash
+# Create a temporary container from the image
+docker create --name temp-container gerrit-plugins-lfs:3.2
+
+# Copy the lfs.jar from the container
+docker cp temp-container:/workspace/output/lfs.jar ./lfs.jar
+
+# Remove the temporary container
+docker rm temp-container
+```
+
+#### For Gerrit 2.13
+
+1. **Build the plugin using Docker:**
+
+```bash
+cd 2.13
+./build.sh
+```
+
+This will create a Docker image `gerrit-plugins-lfs:2.13` containing the built plugin.
+
+2. **Extract the lfs.jar from the Docker container:**
+
+```bash
+# Create a temporary container from the image
+docker create --name temp-container gerrit-plugins-lfs:2.13
+
+# Copy the lfs.jar from the container
+# Note: For 2.13, the JAR location may vary. Check the container:
+docker cp temp-container:/workspace/gerrit/plugins/lfs/lfs.jar ./lfs.jar
+
+# Or if built with Buck:
+docker cp temp-container:/workspace/gerrit/buck-out/gen/plugins/lfs/lfs.jar ./lfs.jar
+
+# Remove the temporary container
+docker rm temp-container
+```
+
+### Install the Plugin on Gerrit Server
+
+1. **Copy lfs.jar to the Gerrit plugins directory:**
+
+```bash
+# Copy the built lfs.jar to your Gerrit installation
+cp lfs.jar /path/to/gerrit/plugins/lfs.jar
+
+# Ensure proper permissions
+chown gerrit:gerrit /path/to/gerrit/plugins/lfs.jar
+chmod 644 /path/to/gerrit/plugins/lfs.jar
+```
+
+2. **Restart Gerrit:**
+
+```bash
+# Restart your Gerrit server to load the plugin
+# The exact command depends on your Gerrit installation method
+systemctl restart gerrit
+# OR
+/path/to/gerrit/bin/gerrit.sh restart
+```
+
+3. **Verify the plugin is loaded:**
+
+Check the Gerrit logs or web interface to confirm the LFS plugin is loaded. You should see the plugin listed in the Gerrit plugins page or in the startup logs.
+
+**Note:** The plugin must be installed before configuring it. After installation, proceed to the [Config](#config) section to configure the plugin.
+
 ## Config
 
 ### 1. /path/to/gerrit/etc/gerrit.config
@@ -21,10 +155,10 @@
 **For MinIO (S3-compatible)**
 
 ```
-[s3]
+[s3 "minio"]
     hostname = localhost:9000
     region = us-east-1
-    bucket = my-lfs-bucket
+    bucket = gerritlfs
     storageClass = REDUCED_REDUNDANCY
     expirationSeconds = 60
     disableSslVerify = true
@@ -33,7 +167,7 @@
 **For AWS S3**
 
 ```
-[s3]
+[s3 "aws"]
     hostname = s3.amazonaws.com
     region = us-east-1
     bucket = my-lfs-bucket
@@ -45,7 +179,7 @@
 **Note:** For security, place `s3.accessKey` and `s3.secretKey` in `/path/to/gerrit/etc/lfs.secure.config`:
 
 ```
-[s3]
+[s3 "minio]
     accessKey = YOUR_ACCESS_KEY
     secretKey = YOUR_SECRET_KEY
 ```
@@ -70,46 +204,25 @@
 
 ### 3. All-Projects/refs/meta/config/lfs.config
 
+**Enable LFS for all projects using MinIO S3 backend:**
+
 ```
-[lfs "test-repo"]
+[lfs "?/*"]
     enabled = true
     maxObjectSize = 1g
-    backend = s3
-[storage]
-    backend = s3
+    backend = minio
 ```
 
-### 3. test-repo
+**Configuration Options:**
+- `[lfs "?/*"]`: Pattern to enable LFS for all projects. You can also use:
+  - `[lfs "project-name"]` for a specific project
+  - `[lfs "namespace/*"]` for projects under a namespace
+  - `[lfs "test-repo"]` for a single project (example)
+- `enabled = true`: Enable LFS for matching projects
+- `maxObjectSize = 1g`: Maximum object size (supports k, m, g suffixes)
+- `backend = minio`: Use the MinIO S3 backend defined in global config. If not specified, defaults to filesystem backend (`fs`)
 
-```bash
-# Clone repo
-git clone http://127.0.0.1:8080/a/test-repo
-cd test-repo
-
-# Configure LFS
-git lfs install
-git config lfs.url http://127.0.0.1:8080/a/test-repo/info/lfs
-git config credential.helper store
-
-# Verify LFS is configured
-git ls-remote http://127.0.0.1:8080/a/test-repo
-
-# Trace file types that will be stored on S3 backend (MinIO or AWS S3)
-# Files will be stored on S3-compatible storage server
-git lfs track "*.bin"
-git lfs track "*.dat"
-git add .gitattributes
-git commit -m "Configure Git LFS tracking with S3 backend"
-
-# Push LFS files (will be stored on S3-compatible storage server)
-git add large-file.bin
-git commit -m "Add large binary file (stored on S3 backend)"
-git push origin HEAD:refs/for/master
-
-# Verify LFS file was uploaded to S3 backend
-# The file should be accessible on S3 server (check MinIO Console at http://localhost:9001)
-git lfs ls-files
-```
+**Note:** The `backend = minio` setting ensures LFS objects are stored in your MinIO S3 bucket instead of the local filesystem. The backend name (`minio`) must match the section name in your global `lfs.config` file (e.g., `[s3 "minio"]`).
 
 ## Storage
 
@@ -188,6 +301,37 @@ mc ls local/
 ```
 
 For more information, refer to the [MinIO Quickstart Guide](https://github.com/craftslab/minio).
+
+## Usage
+
+```bash
+# Clone repo
+git clone http://127.0.0.1:8080/a/test-repo
+cd test-repo
+
+# Configure LFS
+git config lfs.url http://127.0.0.1:8080/a/test-repo/info/lfs
+git config credential.helper store
+
+# Verify LFS is configured
+git ls-remote http://127.0.0.1:8080/a/test-repo
+
+# Trace file types that will be stored on S3 backend (MinIO or AWS S3)
+# Files will be stored on S3-compatible storage server
+git lfs track "*.bin"
+git lfs track "*.dat"
+git add .gitattributes
+git commit -m "Configure Git LFS tracking with S3 backend"
+
+# Push LFS files (will be stored on S3-compatible storage server)
+git add large-file.bin
+git commit -m "Add large binary file (stored on S3 backend)"
+git push origin HEAD:refs/for/master
+
+# Verify LFS file was uploaded to S3 backend
+# The file should be accessible on S3 server (check MinIO Console at http://localhost:9001)
+git lfs ls-files
+```
 
 ## Reference
 
