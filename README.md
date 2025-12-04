@@ -298,26 +298,57 @@ docker run -d \
    ```
 
 2. **Generate self-signed certificate:**
+
+   **For IP address:**
+   ```bash
+   cd certs
+   # Create certificate with IP address in Subject Alternative Name (SAN)
+   openssl req -new -newkey rsa:2048 -days 365 -nodes -x509 \
+     -keyout private.key \
+     -out public.crt \
+     -subj "/C=US/ST=State/L=City/O=Organization/CN=YOUR_IP" \
+     -addext "subjectAltName=IP:YOUR_IP"
+
+   # Set proper permissions
+   chmod 600 private.key
+   chmod 644 public.crt
+   ```
+
+   **For hostname:**
+   ```bash
+   cd certs
+   # Create certificate with hostname in Subject Alternative Name (SAN)
+   openssl req -new -newkey rsa:2048 -days 365 -nodes -x509 \
+     -keyout private.key \
+     -out public.crt \
+     -subj "/C=US/ST=State/L=City/O=Organization/CN=YOUR_HOSTNAME" \
+     -addext "subjectAltName=DNS:YOUR_HOSTNAME"
+
+   # Set proper permissions
+   chmod 600 private.key
+   chmod 644 public.crt
+   ```
+
+   **For both IP and hostname:**
    ```bash
    cd certs
    openssl req -new -newkey rsa:2048 -days 365 -nodes -x509 \
      -keyout private.key \
-     -out public.pem \
-     -subj "/C=US/ST=State/L=City/O=Organization/CN=YOUR_HOSTNAME_OR_IP"
+     -out public.crt \
+     -subj "/C=US/ST=State/L=City/O=Organization/CN=YOUR_HOSTNAME" \
+     -addext "subjectAltName=IP:YOUR_IP,DNS:YOUR_HOSTNAME"
 
    # Set proper permissions
    chmod 600 private.key
-   chmod 644 public.pem
+   chmod 644 public.crt
    ```
-
-   **Replace `YOUR_HOSTNAME_OR_IP`** with your MinIO server's hostname or IP address.
 
 3. **Verify certificate files:**
    ```bash
    ls -la certs/
    # Should show:
    # - private.key (private key file)
-   # - public.pem (certificate file)
+   # - public.crt (certificate file)
    ```
 
 4. **Restart MinIO:**
@@ -338,7 +369,7 @@ docker run -d \
 **For Production:** Use proper SSL certificates from a Certificate Authority (CA) instead of self-signed certificates.
 
 **Note:** MinIO automatically detects and uses certificates placed in `/root/.minio/certs` directory:
-- `public.pem` (or `public.crt`) for the certificate
+- `public.crt` for the certificate
 - `private.key` for the private key
 
 ### Create Credentials
@@ -360,11 +391,64 @@ docker run -d \
 
 You can test MinIO using the MinIO Client (`mc`):
 
+#### Install MinIO Client
+
 ```bash
-mc alias set local http://localhost:9000 minioadmin minioadmin
-mc admin info local
-mc mb local/my-lfs-bucket
-mc ls local/
+# Download MinIO Client
+curl https://dl.min.io/client/mc/release/linux-amd64/mc -o mc
+chmod +x mc
+
+# Or install via package manager
+# Ubuntu/Debian: wget https://dl.min.io/client/mc/release/linux-amd64/mc -O /usr/local/bin/mc && chmod +x /usr/local/bin/mc
+```
+
+#### Configure MinIO Alias
+
+```bash
+# Set alias for your MinIO server (use HTTPS if certificates are configured)
+mc alias set myminio https://minio_ip:9000 minioadmin minioadmin
+```
+
+#### Check Bucket Status
+
+```bash
+# List all buckets
+mc ls myminio
+
+# List objects in a specific bucket (e.g., gerritlfs)
+mc ls myminio/gerritlfs
+
+# Get detailed bucket information
+mc stat myminio/gerritlfs
+
+# Count objects in bucket
+mc ls --recursive myminio/gerritlfs | wc -l
+
+# Get bucket size and object count
+mc du myminio/gerritlfs
+
+# List objects with details (size, date)
+mc ls --recursive myminio/gerritlfs
+
+# Check if bucket exists
+mc ls myminio/gerritlfs 2>&1 | grep -q "gerritlfs" && echo "Bucket exists" || echo "Bucket not found"
+```
+
+#### Other Useful Commands
+
+```bash
+# Get MinIO server information
+mc admin info myminio
+
+# Create a new bucket
+mc mb myminio/my-new-bucket
+
+# Remove a bucket (be careful!)
+# mc rb myminio/my-bucket
+
+# Copy files to/from bucket
+# mc cp local-file.txt myminio/gerritlfs/
+# mc cp myminio/gerritlfs/file.txt ./
 ```
 
 For more information, refer to the [MinIO Quickstart Guide](https://github.com/craftslab/minio).
@@ -379,6 +463,20 @@ cd test-repo
 # Configure LFS
 git config lfs.url http://127.0.0.1:8080/a/test-repo/info/lfs
 git config credential.helper store
+
+# For self-signed certificates, add certificate to system trust store (RECOMMENDED)
+# This is REQUIRED because git-lfs uploads directly to MinIO using pre-signed URLs
+# and doesn't trust self-signed certificates by default
+#
+# Step 1: Copy certificate from MinIO server to local machine
+scp user@minio-server:/path/to/minio/certs/public.crt /tmp/minio.crt
+
+# Step 2: Add certificate to system trust store
+sudo cp /tmp/minio.crt /usr/local/share/ca-certificates/minio.crt
+sudo update-ca-certificates
+
+# Step 3: Verify certificate was added
+ls -la /etc/ssl/certs/ | grep minio
 
 # Verify LFS is configured
 git ls-remote http://127.0.0.1:8080/a/test-repo
@@ -426,7 +524,29 @@ cat .git/lfs/logs/YYYYMMDDTHHMMSS.XXXXXXXX.log
 
 2. **SSL/HTTPS Connection Errors**
    - Ensure MinIO is configured with SSL certificates (see [Generate SSL Certificates](#generate-ssl-certificates))
-   - Verify `disableSslVerify = true` in `lfs.config` when using self-signed certificates
+   - **"certificate signed by unknown authority" error (git-lfs):**
+     - This occurs when git-lfs doesn't trust the self-signed certificate
+     - **Solution (Recommended):** Add the certificate to your system's trust store:
+       ```bash
+       # Step 1: Copy certificate from MinIO server to local machine
+       scp user@minio-server:/path/to/minio/certs/public.crt /tmp/minio.crt
+
+       # Step 2: Add certificate to system trust store
+       sudo cp /tmp/minio.crt /usr/local/share/ca-certificates/minio.crt
+       sudo update-ca-certificates
+
+       # Step 3: Verify certificate was added
+       ls -la /etc/ssl/certs/ | grep minio
+       ```
+       After this, git-lfs will trust the certificate and you can push without errors.
+     - **Alternative (Testing only):** Environment variable or git config (may not work with all git-lfs versions):
+       ```bash
+       export GIT_LFS_SKIP_SSL_VERIFY=1
+       # OR
+       git config lfs.https://minio_ip:9000/.sslverify false
+       ```
+       **Note:** These methods may not work reliably with git-lfs 3.4+. Adding to trust store is the recommended solution.
+   - Verify `disableSslVerify = true` in `lfs.config` when using self-signed certificates (this only affects Gerrit's connection, not git-lfs)
    - Check that hostname in `lfs.config` does NOT include `http://` or `https://` prefix
 
 3. **Empty MinIO Bucket**
