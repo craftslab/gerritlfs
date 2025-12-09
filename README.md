@@ -152,7 +152,7 @@ Check the Gerrit logs or web interface to confirm the LFS plugin is loaded. You 
 
 ### 2. /path/to/gerrit/etc/lfs.config
 
-**For MinIO (S3-compatible)**
+**For MinIO (S3-compatible) - Direct Access**
 
 ```
 [s3 "minio"]
@@ -163,6 +163,26 @@ Check the Gerrit logs or web interface to confirm the LFS plugin is loaded. You 
     expirationSeconds = 60
     disableSslVerify = true
 ```
+
+**For MinIO (S3-compatible) - Behind Nginx Reverse Proxy**
+
+When MinIO is behind an nginx reverse proxy serving at root path (recommended for production):
+
+```
+[s3 "minio"]
+    hostname = your-domain.com
+    region = us-east-1
+    bucket = gerritlfs
+    storageClass = REDUCED_REDUNDANCY
+    expirationSeconds = 60
+    disableSslVerify = true
+```
+
+**Important:** When using nginx reverse proxy:
+- Configure nginx to serve MinIO S3 API at root path (`/`) for standard S3 endpoint compatibility
+- Use only the domain name in `hostname` (e.g., `your-domain.com`), without protocol or path
+- Do NOT include `http://`, `https://`, or path prefixes in the hostname
+- The nginx reverse proxy should handle SSL termination and forward requests to MinIO
 
 **For AWS S3**
 
@@ -185,16 +205,20 @@ Check the Gerrit logs or web interface to confirm the LFS plugin is loaded. You 
 ```
 
 **MinIO Configuration Options**
-- `s3.hostname`: Use `hostname:port` or `ip:port` format
+- `s3.hostname`: Use `hostname:port`, `ip:port`, or `domain.com` format
   - **Important:** Do NOT include `http://` or `https://` protocol prefix
-  - The AWS S3 SDK defaults to HTTPS, so ensure MinIO is configured with HTTPS (see [Generate SSL Certificates](#generate-ssl-certificates))
+  - **Important:** Do NOT include path prefixes (e.g., `/minio/api`) in hostname
+  - For direct access: Use `localhost:9000` or `minio-server:9000`
+  - For nginx reverse proxy: Use only the domain name (e.g., `your-domain.com`) - nginx should serve MinIO at root path
+  - The AWS S3 SDK defaults to HTTPS, so ensure MinIO or nginx is configured with HTTPS (see [Generate SSL Certificates](#generate-ssl-certificates))
 - `s3.region`: Can be any value (e.g., `us-east-1`) as MinIO is S3-compatible but doesn't enforce AWS regions
 - `s3.bucket`: Must match the bucket name created in MinIO
 - `s3.disableSslVerify`: Set to `true` when using self-signed certificates or for testing
 
 **S3 Configuration Options**
 - `s3.hostname`: Custom hostname for S3 API server
-  - For MinIO: Use `localhost:9000` (or your MinIO server hostname:port)
+  - For MinIO (direct): Use `localhost:9000` (or your MinIO server hostname:port)
+  - For MinIO (nginx proxy): Use domain name only (e.g., `your-domain.com`) - nginx must serve MinIO at root path
   - For AWS: Use `s3.amazonaws.com` (default)
 - `s3.region`: Amazon region where the S3 bucket resides (for MinIO, any value is acceptable)
 - `s3.bucket`: Name of the S3 storage bucket (must exist in MinIO/AWS)
@@ -263,6 +287,61 @@ The `docker-compose.yml` file uses:
 **Important:** The certificate volume mount (`./certs:/root/.minio/certs`) is required for HTTPS support, which is necessary because the AWS S3 SDK (used by Gerrit LFS) defaults to HTTPS connections.
 
 For the complete configuration, see [minio/docker-compose.yml](https://github.com/craftslab/minio/blob/master/docker-compose.yml).
+
+#### Using Nginx Reverse Proxy (Recommended for Production)
+
+For production deployments, it's recommended to use nginx as a reverse proxy in front of MinIO to handle SSL termination and provide a clean endpoint. The nginx configuration should serve MinIO S3 API at the root path (`/`) for standard S3 endpoint compatibility.
+
+**Example nginx configuration:**
+
+```nginx
+server {
+    listen 80;
+    server_name your-domain.com;
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl;
+    server_name your-domain.com;
+
+    ssl_certificate /etc/nginx/certs/public.crt;
+    ssl_certificate_key /etc/nginx/certs/private.key;
+
+    # To allow special characters in headers
+    ignore_invalid_headers off;
+    # Allow any size file to be uploaded
+    client_max_body_size 0;
+    # To disable buffering
+    proxy_buffering off;
+    proxy_request_buffering off;
+
+    # MinIO S3 API endpoint at root
+    location / {
+        proxy_pass http://minio:9000/;
+
+        proxy_set_header Host $http_host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header X-Forwarded-Host $host;
+        proxy_set_header X-Forwarded-Port 443;
+
+        proxy_connect_timeout 300;
+        proxy_http_version 1.1;
+        proxy_set_header Connection "";
+        chunked_transfer_encoding off;
+    }
+}
+```
+
+**Important:**
+- MinIO S3 API must be served at root path (`/`) for compatibility with Gerrit LFS plugin
+- The `hostname` in `lfs.config` should be set to your domain name only (e.g., `your-domain.com`)
+- Do NOT include path prefixes in the hostname configuration
+- Nginx handles SSL termination, so MinIO can run without SSL certificates when behind nginx
+
+For the complete nginx and docker-compose configuration, see [minio/nginx.conf](https://github.com/craftslab/minio/blob/master/nginx.conf) and [minio/docker-compose.yml](https://github.com/craftslab/minio/blob/master/docker-compose.yml).
 
 #### Using Docker Run
 
@@ -556,8 +635,21 @@ cat .git/lfs/logs/YYYYMMDDTHHMMSS.XXXXXXXX.log
 
 4. **Connection Refused or Unknown Host**
    - Verify MinIO is running: `docker-compose ps`
-   - Test connectivity: `curl -k https://YOUR_HOSTNAME:9000/minio/health/live`
+   - Test connectivity:
+     - Direct access: `curl -k https://YOUR_HOSTNAME:9000/minio/health/live`
+     - Via nginx: `curl -k https://YOUR_DOMAIN/minio/health/live`
    - Check firewall rules and network connectivity between Gerrit and MinIO servers
+   - If using nginx reverse proxy, verify nginx is running and properly configured
+
+5. **"UnknownHostException: https: Name or service not known" Error**
+   - This error occurs when the hostname includes a protocol prefix (`http://` or `https://`)
+   - **Solution:** Remove protocol prefix from `hostname` in `lfs.config`
+     - ❌ Wrong: `hostname = https://your-domain.com`
+     - ✅ Correct: `hostname = your-domain.com`
+   - If using nginx reverse proxy, ensure hostname is domain name only (no path prefixes)
+     - ❌ Wrong: `hostname = your-domain.com/minio/api`
+     - ✅ Correct: `hostname = your-domain.com`
+     - Configure nginx to serve MinIO at root path (`/`) instead of a subpath
 
 ## Reference
 
