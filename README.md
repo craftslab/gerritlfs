@@ -100,11 +100,7 @@ This will create a Docker image `gerrit-plugins-lfs:2.13` containing the built p
 docker create --name temp-container gerrit-plugins-lfs:2.13
 
 # Copy the lfs.jar from the container
-# Note: For 2.13, the JAR location may vary. Check the container:
 docker cp temp-container:/workspace/gerrit/plugins/lfs/lfs.jar ./lfs.jar
-
-# Or if built with Buck:
-docker cp temp-container:/workspace/gerrit/buck-out/gen/plugins/lfs/lfs.jar ./lfs.jar
 
 # Remove the temporary container
 docker rm temp-container
