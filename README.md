@@ -913,6 +913,67 @@ cat .git/lfs/logs/YYYYMMDDTHHMMSS.XXXXXXXX.log
      - ✅ Correct: `hostname = your-domain.com`
      - Configure nginx to serve S3 API at root path (`/`) instead of a subpath
 
+6. **Adding lfs.config to All-Projects.git Bare Repository (Gerrit 2.13)**
+   - **Problem:** When you cannot push `lfs.config` via HTTP due to permission issues (e.g., "You are not allowed to perform this operation"), you need to add it directly to the bare repository on the server.
+   - **Solution:** Use the `transfer-commit.sh` script provided in the `2.13/` directory.
+   - **Steps:**
+     1. **Prepare your lfs.config file:**
+        ```bash
+        # Create or edit your lfs.config file
+        cd ~/my-tmp/google-gerrit/All-Projects-2.13.4
+        # Edit lfs.config with your configuration
+        nano lfs.config
+        ```
+     2. **Create a temporary working repository:**
+        ```bash
+        cd /tmp
+        mkdir fix-gerrit && cd fix-gerrit
+        git clone ~/my-tmp/google-gerrit/install-2.13.4/git/All-Projects.git temp-repo
+        cd temp-repo
+        ```
+     3. **Checkout refs/meta/config and add lfs.config:**
+        ```bash
+        git fetch origin refs/meta/config:refs/meta/config
+        git checkout refs/meta/config
+        cp ~/my-tmp/google-gerrit/All-Projects-2.13.4/lfs.config .
+        git add lfs.config
+        git commit -m "Add lfs.config for Git LFS configuration"
+        NEW_COMMIT=$(git rev-parse HEAD)
+        ```
+     4. **Use transfer-commit.sh to transfer the commit to bare repository:**
+        ```bash
+        # Copy the script to your working directory
+        cp ~/my-tmp/gerritlfs/2.13/transfer-commit.sh .
+
+        # Edit the script to set correct paths:
+        # - TEMP_REPO: path to your temp-repo (e.g., /tmp/fix-gerrit/temp-repo)
+        # - BARE_REPO: path to All-Projects.git bare repository
+        # - NEW_COMMIT: the commit hash from step 3
+
+        # Run the script
+        bash transfer-commit.sh
+        ```
+     - **What the script does:**
+       - Tries to push the commit directly from temp-repo to bare repository (most reliable)
+       - Falls back to fetching objects if push fails
+       - Falls back to copying Git objects directly if fetch fails
+       - Updates `refs/meta/config` in the bare repository
+       - Verifies that `lfs.config` exists and shows its contents
+   - **Alternative Quick Method:**
+     ```bash
+     # From temp-repo, push directly to bare repository
+     cd /tmp/fix-gerrit/temp-repo
+     git push ~/my-tmp/google-gerrit/install-2.13.4/git/All-Projects.git refs/meta/config:refs/meta/config
+
+     # Verify
+     cd ~/my-tmp/google-gerrit/install-2.13.4/git/All-Projects.git
+     git show refs/meta/config:lfs.config
+     ```
+   - **After adding lfs.config:**
+     - Restart Gerrit to load the new configuration: `systemctl restart gerrit`
+     - The configuration will be inherited by all projects
+     - Test LFS functionality by pushing a large file to a project
+
 ## Reference
 
 - [dev-buck](https://gerrit-documentation.storage.googleapis.com/Documentation/2.13/dev-buck.html)

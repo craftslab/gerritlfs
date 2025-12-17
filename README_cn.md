@@ -917,6 +917,67 @@ cat .git/lfs/logs/YYYYMMDDTHHMMSS.XXXXXXXX.log
      - ✅ 正确：`hostname = your-domain.com`
      - 配置 nginx 在根路径 (`/`) 提供 S3 API，而不是子路径
 
+6. **将 lfs.config 添加到 All-Projects.git 裸仓库（Gerrit 2.13）**
+   - **问题：** 当由于权限问题（例如，"You are not allowed to perform this operation"）无法通过 HTTP 推送 `lfs.config` 时，需要直接在服务器上的裸仓库中添加它。
+   - **解决方案：** 使用 `2.13/` 目录中提供的 `transfer-commit.sh` 脚本。
+   - **步骤：**
+     1. **准备您的 lfs.config 文件：**
+        ```bash
+        # 创建或编辑您的 lfs.config 文件
+        cd ~/my-tmp/google-gerrit/All-Projects-2.13.4
+        # 使用您的配置编辑 lfs.config
+        nano lfs.config
+        ```
+     2. **创建临时工作仓库：**
+        ```bash
+        cd /tmp
+        mkdir fix-gerrit && cd fix-gerrit
+        git clone ~/my-tmp/google-gerrit/install-2.13.4/git/All-Projects.git temp-repo
+        cd temp-repo
+        ```
+     3. **检出 refs/meta/config 并添加 lfs.config：**
+        ```bash
+        git fetch origin refs/meta/config:refs/meta/config
+        git checkout refs/meta/config
+        cp ~/my-tmp/google-gerrit/All-Projects-2.13.4/lfs.config .
+        git add lfs.config
+        git commit -m "Add lfs.config for Git LFS configuration"
+        NEW_COMMIT=$(git rev-parse HEAD)
+        ```
+     4. **使用 transfer-commit.sh 将提交传输到裸仓库：**
+        ```bash
+        # 将脚本复制到您的工作目录
+        cp ~/my-tmp/gerritlfs/2.13/transfer-commit.sh .
+
+        # 编辑脚本以设置正确的路径：
+        # - TEMP_REPO: 您的 temp-repo 路径（例如，/tmp/fix-gerrit/temp-repo）
+        # - BARE_REPO: All-Projects.git 裸仓库路径
+        # - NEW_COMMIT: 步骤 3 中的提交哈希
+
+        # 运行脚本
+        bash transfer-commit.sh
+        ```
+     - **脚本的作用：**
+       - 尝试直接从 temp-repo 推送到裸仓库（最可靠）
+       - 如果推送失败，回退到获取对象
+       - 如果获取失败，回退到直接复制 Git 对象
+       - 更新裸仓库中的 `refs/meta/config`
+       - 验证 `lfs.config` 存在并显示其内容
+   - **替代快速方法：**
+     ```bash
+     # 从 temp-repo 直接推送到裸仓库
+     cd /tmp/fix-gerrit/temp-repo
+     git push ~/my-tmp/google-gerrit/install-2.13.4/git/All-Projects.git refs/meta/config:refs/meta/config
+
+     # 验证
+     cd ~/my-tmp/google-gerrit/install-2.13.4/git/All-Projects.git
+     git show refs/meta/config:lfs.config
+     ```
+   - **添加 lfs.config 后：**
+     - 重启 Gerrit 以加载新配置：`systemctl restart gerrit`
+     - 配置将被所有项目继承
+     - 通过向项目推送大文件来测试 LFS 功能
+
 ## 参考
 
 - [dev-buck](https://gerrit-documentation.storage.googleapis.com/Documentation/2.13/dev-buck.html)
