@@ -492,7 +492,7 @@ docker run -d \
 5. **Verify HTTPS is working:**
    ```bash
    # Test HTTPS endpoint
-   curl -k https://YOUR_HOSTNAME_OR_IP:9000/minio/health/live
+   curl -k https://YOUR_HOSTNAME_OR_IP:9000/minio/health
 
    # Check MinIO logs
    docker-compose logs minio | grep -i "certificate\|https\|ssl"
@@ -897,9 +897,9 @@ cat .git/lfs/logs/YYYYMMDDTHHMMSS.XXXXXXXX.log
      - For MinIO: `docker-compose ps` or `docker ps | grep minio`
      - For RustFS: `docker ps | grep rustfs`
    - Test connectivity:
-     - MinIO direct access: `curl -k https://YOUR_HOSTNAME:9000/minio/health/live`
-     - RustFS direct access: `curl -k https://YOUR_HOSTNAME:9002/health/live` (if health endpoint available)
-     - Via nginx: `curl -k https://YOUR_DOMAIN/health/live`
+     - MinIO direct access: `curl -k https://YOUR_HOSTNAME:9000/minio/health`
+     - RustFS direct access: `curl -k https://YOUR_HOSTNAME:9002/health`
+     - Via nginx: `curl -k https://YOUR_DOMAIN/health`
    - Check firewall rules and network connectivity between Gerrit and S3 servers
    - If using nginx reverse proxy, verify nginx is running and properly configured
 

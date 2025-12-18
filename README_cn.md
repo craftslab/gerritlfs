@@ -496,7 +496,7 @@ docker run -d \
 5. **验证 HTTPS 是否正常工作：**
    ```bash
    # 测试 HTTPS 端点
-   curl -k https://YOUR_HOSTNAME_OR_IP:9000/minio/health/live
+   curl -k https://YOUR_HOSTNAME_OR_IP:9000/minio/health
 
    # 检查 MinIO 日志
    docker-compose logs minio | grep -i "certificate\|https\|ssl"
@@ -901,9 +901,9 @@ cat .git/lfs/logs/YYYYMMDDTHHMMSS.XXXXXXXX.log
      - 对于 MinIO：`docker-compose ps` 或 `docker ps | grep minio`
      - 对于 RustFS：`docker ps | grep rustfs`
    - 测试连接：
-     - MinIO 直接访问：`curl -k https://YOUR_HOSTNAME:9000/minio/health/live`
-     - RustFS 直接访问：`curl -k https://YOUR_HOSTNAME:9002/health/live`（如果健康端点可用）
-     - 通过 nginx：`curl -k https://YOUR_DOMAIN/health/live`
+     - MinIO 直接访问：`curl -k https://YOUR_HOSTNAME:9000/minio/health`
+     - RustFS 直接访问：`curl -k https://YOUR_HOSTNAME:9002/health`（如果健康端点可用）
+     - 通过 nginx：`curl -k https://YOUR_DOMAIN/health`
    - 检查防火墙规则和 Gerrit 与 S3 服务器之间的网络连接
    - 如果使用 nginx 反向代理，验证 nginx 正在运行并正确配置
 
