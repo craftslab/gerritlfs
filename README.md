@@ -792,18 +792,18 @@ git config lfs.url http://127.0.0.1:8080/a/test-repo/info/lfs
 git config credential.helper store
 
 # For self-signed certificates, add certificate to system trust store (RECOMMENDED)
-# This is REQUIRED because git-lfs uploads directly to MinIO using pre-signed URLs
+# This is REQUIRED because git-lfs uploads directly to RustFS using pre-signed URLs
 # and doesn't trust self-signed certificates by default
 #
-# Step 1: Copy certificate from MinIO server to local machine
-scp user@minio-server:/path/to/minio/certs/public.crt /tmp/minio.crt
+# Step 1: Copy certificate from RustFS server to local machine
+scp user@rustfs-server:/path/to/rustfs/certs/public.crt /tmp/rustfs.crt
 
 # Step 2: Add certificate to system trust store
-sudo cp /tmp/minio.crt /usr/local/share/ca-certificates/minio.crt
+sudo cp /tmp/rustfs.crt /usr/local/share/ca-certificates/rustfs.crt
 sudo update-ca-certificates
 
 # Step 3: Verify certificate was added
-ls -la /etc/ssl/certs/ | grep minio
+ls -la /etc/ssl/certs/ | grep rustfs
 
 # Verify LFS is configured
 git ls-remote http://127.0.0.1:8080/a/test-repo
