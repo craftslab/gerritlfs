@@ -790,6 +790,8 @@ cd test-repo
 # Configure LFS
 git config lfs.url http://127.0.0.1:8080/a/test-repo/info/lfs
 git config lfs.http://127.0.0.1:8080/a/test-repo/info/lfs.locksverify true
+
+# Configure credential (~/.git-credentials)
 git config credential.helper store
 
 # For self-signed certificates, add certificate to system trust store (RECOMMENDED)
