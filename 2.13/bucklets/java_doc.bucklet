@@ -1,0 +1,69 @@
+# Copyright (C) 2013 The Android Open Source Project
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# This bucklet simplifies creation of Javadocs
+#
+# Example:
+#
+# java_doc(
+#   name = 'javadoc',
+#   title = 'Gitiles API Documentation',
+#   pkgs = ['com.google.gitiles'],
+#   paths = ['gitiles-servlet/src/main/java'],
+#   srcs = glob([n + '**/*.java' for n in SRCS]),
+#   deps = DEPS,
+#   visibility = ['PUBLIC'],
+# )
+#
+def java_doc(
+    name,
+    title,
+    pkgs,
+    paths,
+    srcs = [],
+    deps = [],
+    visibility = [],
+    do_it_wrong = False,
+    external_docs = [],
+  ):
+  if do_it_wrong:
+    sourcepath = paths
+  else:
+    sourcepath = ['$SRCDIR/' + n for n in paths]
+  external_docs.insert(0, 'http://docs.oracle.com/javase/8/docs/api')
+  genrule(
+    name = name,
+    cmd = ' '.join([
+      'while ! test -f .buckconfig; do cd ..; done;',
+      'javadoc',
+      '-Xdoclint:-missing',
+      '-quiet',
+      '-protected',
+      '-encoding UTF-8',
+      '-charset UTF-8',
+      '-notimestamp',
+      '-windowtitle "' + title + '"',
+      ' '.join(['-link %s' % url for url in external_docs]),
+      '-subpackages ',
+      ':'.join(pkgs),
+      '-sourcepath ',
+      ':'.join(sourcepath),
+      ' -classpath ',
+      ':'.join(['$(location %s)' % n for n in deps]),
+      '-d $TMP',
+    ]) + ';jar cf $OUT -C $TMP .',
+    srcs = srcs,
+    out = name + '.jar',
+    visibility = visibility,
+)
