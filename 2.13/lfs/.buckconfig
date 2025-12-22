@@ -7,6 +7,7 @@
 
 [project]
   ignore = .git
+  read_only_paths = bucklets
 
 [cache]
   mode = dir
