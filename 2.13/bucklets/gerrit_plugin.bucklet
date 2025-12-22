@@ -84,21 +84,22 @@ def gerrit_plugin(
     type = 'plugin',
     visibility = ['PUBLIC'],
     target_suffix = ''):
-  from multiprocessing import cpu_count
-  from os import path,getcwd
+  with allow_unsafe_import():
+    import multiprocessing
+    import os
   # TODO(davido): Remove this hack and replace all this mess with just
   # ROOT = get_base_path()
   # when this issue is fixed:
   # https://github.com/facebook/buck/issues/200
   # Or this PR is merged:
   # https://github.com/facebook/buck/pull/201
-  ROOT = getcwd()
-  while not path.lexists(path.join(ROOT, '.buckconfig')):
-    ROOT = path.dirname(ROOT)
-  if path.exists(path.join(ROOT, 'VERSION')):
-    include_defs('//' + path.join(ROOT, 'VERSION'))
+  ROOT = os.getcwd()
+  while not os.path.lexists(os.path.join(ROOT, '.buckconfig')):
+    ROOT = os.path.dirname(ROOT)
+  if os.path.exists(os.path.join(ROOT, 'VERSION')):
+    include_defs('//' + os.path.join(ROOT, 'VERSION'))
     mf_cmd = 'v=%s && ' % PLUGIN_VERSION
-  elif path.exists(path.join(ROOT, '.git')):
+  elif os.path.exists(os.path.join(ROOT, '.git')):
     mf_cmd = 'v=\$(git describe --always HEAD) && '
   else: # cannot retrieve plugin version, guessing '1.0'
     mf_cmd = 'v=1.0 && '
@@ -154,7 +155,7 @@ def gerrit_plugin(
       modules = [gwt_module],
       deps = gwt_deps,
       module_deps = [':%s__gwt_module' % name],
-      local_workers = cpu_count(),
+      local_workers = multiprocessing.cpu_count(),
       strict = True,
       experimental_args = GWT_COMPILER_ARGS,
       vm_args = GWT_JVM_ARGS,

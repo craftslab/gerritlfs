@@ -21,6 +21,12 @@ from os import link, makedirs, path, remove
 import shutil
 from subprocess import check_call, CalledProcessError
 from sys import stderr
+
+# Ensure local bucklets/tools modules are importable when executed via buck's PEX.
+import sys
+from os import path as _path_for_sys
+sys.path.insert(0, _path_for_sys.dirname(__file__))
+
 from util import resolve_url
 from zipfile import ZipFile, BadZipfile, LargeZipFile
 
