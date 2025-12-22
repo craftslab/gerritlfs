@@ -13,6 +13,7 @@ RUN apt-get update && apt-get install -y \
     git \
     python \
     python3 \
+    python3-distutils \
     zip \
     unzip \
     ca-certificates \
@@ -23,39 +24,23 @@ WORKDIR /workspace
 
 # Install Buck via .deb and verify installation
 RUN set -eux; \
+    apt-get update && apt-get install -y python3-distutils; \
     BUCK_DEB_URL="https://github.com/facebook/buck/releases/download/v2022.05.05.01/buck.2022.05.05.01_all.deb"; \
     curl -fL "$BUCK_DEB_URL" -o /tmp/buck.deb; \
-    dpkg -i /tmp/buck.deb || apt-get -f install -y; \
-    dpkg -i /tmp/buck.deb; \
+    dpkg -i /tmp/buck.deb || (apt-get -f install -y && dpkg -i /tmp/buck.deb); \
     rm -f /tmp/buck.deb; \
     buck --version
 
-# Clone LFS plugin (stable-2.13) and bucklets, then link as per README
-RUN git clone https://gerrit.googlesource.com/plugins/lfs -b stable-2.13 lfs-2.13 \
-    && git clone https://gerrit.googlesource.com/bucklets \
-    && cd lfs-2.13 \
-    && ln -s ../bucklets . \
-    && ln -s bucklets/buckversion .buckversion \
-    && ln -s bucklets/watchmanconfig .watchmanconfig \
-    && printf '\n[project]\n  read_only_paths = bucklets\n' >> .buckconfig \
-    && printf 'download.MAVEN_CENTRAL=https://repo1.maven.org/maven2\n' > local.properties
+# Use local lfs and bucklets directories from build context
+COPY lfs /workspace/lfs-2.13
+COPY bucklets /workspace/bucklets
 
-# Patch bucklets for Buck 2022.x parser safety and PEX util import
-RUN set -e; \
-  cd /workspace/bucklets; \
-  # gerrit_plugin.bucklet: allow_unsafe_import for multiprocessing/os and path usage
-  sed -i "s/^\s*from multiprocessing import cpu_count//" gerrit_plugin.bucklet; \
-  sed -i "s/^\s*from os import path,getcwd//" gerrit_plugin.bucklet; \
-  awk '/target_suffix = '\''\)\:'\''/ && c==0 {print; print "  with allow_unsafe_import():\n    import multiprocessing\n    import os"; c=1; next} {print}' gerrit_plugin.bucklet > gerrit_plugin.bucklet.tmp && mv gerrit_plugin.bucklet.tmp gerrit_plugin.bucklet; \
-  sed -i "s/ROOT = getcwd()/ROOT = os.getcwd()/" gerrit_plugin.bucklet; \
-  sed -i "s/\bpath\./os.path./g" gerrit_plugin.bucklet; \
-  sed -i "s/local_workers = cpu_count()/local_workers = multiprocessing.cpu_count()/" gerrit_plugin.bucklet; \
-  # tools/download_file.py: ensure script dir on sys.path before importing util
-  cd /workspace/bucklets/tools; \
-  awk 'BEGIN{added=0} /from util import resolve_url/ && !added {print "import sys\nfrom os import path as _path_for_sys\nsys.path.insert(0, _path_for_sys.dirname(__file__))"; added=1} {print}' download_file.py > download_file.py.tmp && mv download_file.py.tmp download_file.py
-
-# Remove unsupported java_test kwarg in plugin BUCK for current Buck
-RUN sed -i "/source_under_test/d" /workspace/lfs-2.13/BUCK
+# Link bucklets into plugin dir and set config overrides
+RUN set -eux; \
+    cd /workspace/lfs-2.13; \
+    ln -s ../bucklets ./bucklets || true; \
+    ln -s bucklets/buckversion .buckversion || true; \
+    ln -s bucklets/watchmanconfig .watchmanconfig || true;
 
 # Build the plugin
 RUN cd /workspace/lfs-2.13 \
