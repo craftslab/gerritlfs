@@ -21,9 +21,14 @@ RUN apt-get update && apt-get install -y \
 # Create working directory
 WORKDIR /workspace
 
-# Install Buck (PEX) and make it executable
-RUN curl -L https://github.com/facebook/buck/releases/download/v2022.05.05.01/buck.pex -o /usr/local/bin/buck \
-    && chmod +x /usr/local/bin/buck
+# Install Buck via .deb and verify installation
+RUN set -eux; \
+    BUCK_DEB_URL="https://github.com/facebook/buck/releases/download/v2022.05.05.01/buck.2022.05.05.01_all.deb"; \
+    curl -fL "$BUCK_DEB_URL" -o /tmp/buck.deb; \
+    dpkg -i /tmp/buck.deb || apt-get -f install -y; \
+    dpkg -i /tmp/buck.deb; \
+    rm -f /tmp/buck.deb; \
+    buck --version
 
 # Clone LFS plugin (stable-2.13) and bucklets, then link as per README
 RUN git clone https://gerrit.googlesource.com/plugins/lfs -b stable-2.13 lfs-2.13 \

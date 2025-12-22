@@ -6,7 +6,27 @@ This project builds with Buck. Newer Buck (2022.x) enforces stricter import rule
 ## Prerequisites
 - OpenJDK 8
 - curl, zip, unzip, git
-- Buck available on PATH (`buck`), or a compatible wrapper/PEX
+- Buck (install via .deb or PEX below)
+
+## Install Buck
+You can install Buck either from the Debian package or as a standalone PEX.
+
+Option A — Debian package (recommended on Ubuntu 18.04):
+```bash
+sudo apt-get update && sudo apt-get install -y curl
+curl -fL https://github.com/facebook/buck/releases/download/v2022.05.05.01/buck.2022.05.05.01_all.deb -o /tmp/buck.deb
+sudo dpkg -i /tmp/buck.deb || sudo apt-get -f install -y
+sudo dpkg -i /tmp/buck.deb
+rm -f /tmp/buck.deb
+buck --version
+```
+
+Option B — PEX (single-file binary):
+```bash
+sudo curl -fL https://github.com/facebook/buck/releases/download/v2022.05.05.01/buck.pex -o /usr/local/bin/buck
+sudo chmod +x /usr/local/bin/buck
+buck --version
+```
 
 ## One-time setup in the plugin root
 ```bash
