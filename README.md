@@ -146,7 +146,13 @@ Check the Gerrit logs or web interface to confirm the LFS plugin is loaded. You 
     enabled = true
 [lfs]
     plugin = lfs
+[auth]
+    gitBasicAuth = true
 ```
+
+**Important for Gerrit 2.13:**
+- The `auth.gitBasicAuth = true` setting is **required** for LFS HTTP basic authentication to work
+- Without this setting, Git LFS clients will not be able to authenticate with Gerrit
 
 ### 2. /path/to/gerrit/etc/lfs.config
 
@@ -214,6 +220,16 @@ When RustFS is behind an nginx reverse proxy serving at root path (recommended f
 - Do NOT include `http://`, `https://`, or path prefixes in the hostname
 - The nginx reverse proxy should handle SSL termination and forward requests to RustFS
 
+**Special Note for Gerrit 2.13:**
+- Gerrit 2.13 uses JGit LFS 4.5.0 which doesn't natively support custom endpoints
+- The plugin will attempt to use the `hostname` configuration, but due to library limitations, you **MUST** use `/etc/hosts` mapping on both the Gerrit server and client machines
+- **REQUIRED:** For Gerrit 2.13, `accessKey` and `secretKey` **MUST** be placed directly in `lfs.config` (not in `lfs.secure.config`) because Gerrit 2.13.9's `PluginConfigFactory` does not properly merge secure configuration files
+- Add this to `/etc/hosts` on both Gerrit server and client machines:
+  ```
+  YOUR_RUSTFS_IP  your-domain.com s3-us-east-1.amazonaws.com
+  ```
+- Configure nginx to accept both hostnames
+
 **For AWS S3**
 
 ```
@@ -242,6 +258,8 @@ Or for RustFS:
     secretKey = YOUR_SECRET_KEY
 ```
 
+**Important for Gerrit 2.13:** For Gerrit 2.13, `accessKey` and `secretKey` **MUST** be placed directly in `lfs.config` (not in `lfs.secure.config`) because Gerrit 2.13.9's `PluginConfigFactory` does not properly merge secure configuration files. See the RustFS configuration example above for the correct format.
+
 **MinIO Configuration Options**
 - `s3.hostname`: Use `hostname:port`, `ip:port`, or `domain.com` format
   - **Important:** Do NOT include `http://` or `https://` protocol prefix
@@ -267,6 +285,56 @@ Or for RustFS:
 - `s3.disableSslVerify`: Disable SSL verification (default: `false`, set to `true` for local MinIO/RustFS without SSL)
 - `s3.accessKey`: Access key (MinIO/RustFS access key or Amazon IAM access key, recommended in secure config)
 - `s3.secretKey`: Secret key (MinIO/RustFS secret key or Amazon IAM secret key, recommended in secure config)
+
+### Special Configuration for Gerrit 2.13
+
+**Important:** Gerrit 2.13 uses JGit LFS 4.5.0 which has limitations with custom S3 endpoints. Additional configuration is required:
+
+1. **Credentials in `lfs.config` (REQUIRED):**
+   - For Gerrit 2.13, `accessKey` and `secretKey` **MUST** be placed directly in `lfs.config` (not in `lfs.secure.config`)
+   - This is because Gerrit 2.13.9's `PluginConfigFactory` does not properly merge secure configuration files
+   - Example:
+     ```
+     [s3 "rustfs"]
+         hostname = your-domain.com
+         region = us-east-1
+         bucket = gerritlfs
+         storageClass = REDUCED_REDUNDANCY
+         expirationSeconds = 60
+         disableSslVerify = true
+         accessKey = YOUR_ACCESS_KEY
+         secretKey = YOUR_SECRET_KEY
+     ```
+
+2. **Server-side `/etc/hosts` mapping (REQUIRED):**
+   ```bash
+   # On Gerrit server
+   echo "YOUR_S3_SERVER_IP  your-domain.com s3-us-east-1.amazonaws.com" | sudo tee -a /etc/hosts
+   ```
+
+3. **Client-side `/etc/hosts` mapping (REQUIRED):**
+   ```bash
+   # On client machines (where you run git push)
+   echo "YOUR_S3_SERVER_IP  your-domain.com s3-us-east-1.amazonaws.com" | sudo tee -a /etc/hosts
+   ```
+
+4. **Nginx configuration (REQUIRED when using reverse proxy):**
+   - Must accept both hostnames: `server_name your-domain.com s3-us-east-1.amazonaws.com;`
+   - Must preserve original Host header: `proxy_set_header Host $http_host;`
+   - See nginx configuration examples above
+
+5. **Client-side git-lfs SSL configuration (REQUIRED):**
+   ```bash
+   # Skip SSL verification due to certificate hostname mismatch
+   export GIT_SSL_NO_VERIFY=1
+   # OR
+   git config lfs.https://s3-us-east-1.amazonaws.com/.sslverify false
+   ```
+
+6. **Disable proxy for S3 endpoints (if using proxy):**
+   ```bash
+   export no_proxy="your-domain.com,s3-us-east-1.amazonaws.com,YOUR_S3_SERVER_IP,localhost,127.0.0.1"
+   ```
 
 ### 3. All-Projects/refs/meta/config/lfs.config
 
@@ -631,16 +699,18 @@ docker run -d \
 
 For production deployments, use nginx as a reverse proxy in front of RustFS to handle SSL termination. The nginx configuration should serve RustFS S3 API at the root path (`/`) and expose the RustFS console paths.
 
+**For Gerrit 2.13:** The nginx configuration must accept both your custom domain and `s3-us-east-1.amazonaws.com` as server names to support presigned URLs. See the configuration below.
+
 ```nginx
 server {
     listen 80;
-    server_name your-domain.com;
+    server_name your-domain.com s3-us-east-1.amazonaws.com;
     return 301 https://$host$request_uri;
 }
 
 server {
     listen 443 ssl;
-    server_name your-domain.com;
+    server_name your-domain.com s3-us-east-1.amazonaws.com;
 
     ssl_certificate /etc/nginx/certs/public.crt;
     ssl_certificate_key /etc/nginx/certs/private.key;
@@ -716,6 +786,7 @@ server {
 - The `hostname` in `lfs.config` should be set to your domain name only (e.g., `your-domain.com`)
 - Do NOT include path prefixes in the hostname configuration
 - Nginx handles SSL termination, so RustFS can run without SSL certificates when behind nginx
+- **For Gerrit 2.13:** The `server_name` must include both your domain and `s3-us-east-1.amazonaws.com`, and the `Host` header must be preserved (as shown above) for S3 signature validation to work
 
 ### Generate SSL Certificates for RustFS
 
@@ -794,19 +865,35 @@ git config lfs.http://127.0.0.1:8080/a/test-repo/info/lfs.locksverify true
 # Store credential (~/.git-credentials)
 git config credential.helper store
 
-# For self-signed certificates, add certificate to system trust store (RECOMMENDED)
-# This is REQUIRED because git-lfs uploads directly to RustFS using pre-signed URLs
-# and doesn't trust self-signed certificates by default
+# For self-signed certificates or custom hostname (Gerrit 2.13), configure git-lfs SSL verification
+# This is REQUIRED because git-lfs uploads directly to S3 using pre-signed URLs
+# and doesn't trust self-signed certificates or mismatched hostnames by default
 #
-# Step 1: Copy certificate from RustFS server to local machine
+# Option 1: Skip SSL verification for S3 endpoint (for testing or when using /etc/hosts mapping)
+export GIT_SSL_NO_VERIFY=1
+# OR
+git config lfs.https://s3-us-east-1.amazonaws.com/.sslverify false
+
+# Option 2: Add certificate to system trust store (RECOMMENDED for production)
+# Step 1: Copy certificate from S3 server to local machine
+# For MinIO:
+scp user@minio-server:/path/to/minio/certs/public.crt /tmp/minio.crt
+# For RustFS:
 scp user@rustfs-server:/path/to/rustfs/certs/public.crt /tmp/rustfs.crt
 
 # Step 2: Add certificate to system trust store
+sudo cp /tmp/minio.crt /usr/local/share/ca-certificates/minio.crt
+# OR for RustFS:
 sudo cp /tmp/rustfs.crt /usr/local/share/ca-certificates/rustfs.crt
 sudo update-ca-certificates
 
 # Step 3: Verify certificate was added
+ls -la /etc/ssl/certs/ | grep minio
+# OR for RustFS:
 ls -la /etc/ssl/certs/ | grep rustfs
+
+# For Gerrit 2.13: Also add /etc/hosts mapping on client machine
+echo "YOUR_S3_SERVER_IP  your-domain.com s3-us-east-1.amazonaws.com" | sudo tee -a /etc/hosts
 
 # Verify LFS is configured
 git ls-remote http://127.0.0.1:8080/a/test-repo
@@ -916,7 +1003,35 @@ cat .git/lfs/logs/YYYYMMDDTHHMMSS.XXXXXXXX.log
      - ✅ Correct: `hostname = your-domain.com`
      - Configure nginx to serve S3 API at root path (`/`) instead of a subpath
 
-6. **Adding lfs.config to All-Projects.git Bare Repository (Gerrit 2.13)**
+6. **"UnknownHostException: s3-us-east-1.amazonaws.com: Name or service not known" (Gerrit 2.13)**
+   - **Problem:** Gerrit 2.13 uses JGit LFS 4.5.0 which doesn't natively support custom endpoints. The S3 client constructs endpoints from the region (e.g., `s3-us-east-1.amazonaws.com`) instead of using the configured `hostname`.
+   - **Solution:** Use `/etc/hosts` mapping on both Gerrit server and client machines:
+     ```bash
+     # On Gerrit server
+     echo "YOUR_RUSTFS_IP  your-domain.com s3-us-east-1.amazonaws.com" | sudo tee -a /etc/hosts
+
+     # On client machines (where you run git push)
+     echo "YOUR_RUSTFS_IP  your-domain.com s3-us-east-1.amazonaws.com" | sudo tee -a /etc/hosts
+     ```
+   - **Also required:**
+     - Configure nginx to accept `s3-us-east-1.amazonaws.com` as a server name (see nginx configuration above)
+     - Configure nginx to preserve the original `Host` header for S3 signature validation
+     - Configure git-lfs to skip SSL verification (certificate mismatch):
+       ```bash
+       export GIT_SSL_NO_VERIFY=1
+       # OR
+       git config lfs.https://s3-us-east-1.amazonaws.com/.sslverify false
+       ```
+
+7. **"SignatureDoesNotMatch" Error (Gerrit 2.13 with RustFS/MinIO)**
+   - **Problem:** S3 presigned URLs include the hostname in the signature. When Gerrit generates URLs for `s3-us-east-1.amazonaws.com` but requests go to your custom domain, signature validation fails.
+   - **Solution:**
+     - Configure nginx to preserve the original `Host` header: `proxy_set_header Host $http_host;`
+     - Ensure nginx accepts both hostnames: `server_name your-domain.com s3-us-east-1.amazonaws.com;`
+     - Ensure `/etc/hosts` mapping is correct on both server and client
+   - If the error persists, check RustFS/MinIO logs for detailed signature validation errors
+
+8. **Adding lfs.config to All-Projects.git Bare Repository (Gerrit 2.13)**
    - **Problem:** When you cannot push `lfs.config` via HTTP due to permission issues (e.g., "You are not allowed to perform this operation"), you need to add it directly to the bare repository on the server.
    - **Solution:** Use the `transfer-commit.sh` script provided in the `2.13/` directory.
    - **Steps:**

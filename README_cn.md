@@ -150,7 +150,13 @@ systemctl restart gerrit
     enabled = true
 [lfs]
     plugin = lfs
+[auth]
+    gitBasicAuth = true
 ```
+
+**Gerrit 2.13 重要提示：**
+- `auth.gitBasicAuth = true` 设置是**必需的**，以便 LFS HTTP 基本身份验证正常工作
+- 没有此设置，Git LFS 客户端将无法与 Gerrit 进行身份验证
 
 ### 2. /path/to/gerrit/etc/lfs.config
 
@@ -218,6 +224,16 @@ systemctl restart gerrit
 - 不要在主机名中包含 `http://`、`https://` 或路径前缀
 - nginx 反向代理应处理 SSL 终止并将请求转发到 RustFS
 
+**Gerrit 2.13 特别说明：**
+- Gerrit 2.13 使用 JGit LFS 4.5.0，该版本不原生支持自定义端点
+- 插件会尝试使用 `hostname` 配置，但由于库的限制，您**必须**在 Gerrit 服务器和客户端机器上使用 `/etc/hosts` 映射
+- **必需：** 对于 Gerrit 2.13，`accessKey` 和 `secretKey`**必须**直接放在 `lfs.config` 中（而不是 `lfs.secure.config`），因为 Gerrit 2.13.9 的 `PluginConfigFactory` 不会正确合并安全配置文件
+- 在 Gerrit 服务器和客户端机器的 `/etc/hosts` 中添加：
+  ```
+  YOUR_RUSTFS_IP  your-domain.com s3-us-east-1.amazonaws.com
+  ```
+- 配置 nginx 接受两个主机名
+
 **对于 AWS S3**
 
 ```
@@ -246,6 +262,8 @@ systemctl restart gerrit
     secretKey = YOUR_SECRET_KEY
 ```
 
+**Gerrit 2.13 重要提示：** 对于 Gerrit 2.13，`accessKey` 和 `secretKey`**必须**直接放在 `lfs.config` 中（而不是 `lfs.secure.config`），因为 Gerrit 2.13.9 的 `PluginConfigFactory` 不会正确合并安全配置文件。请参见上面的 RustFS 配置示例以了解正确的格式。
+
 **MinIO 配置选项**
 - `s3.hostname`：使用 `hostname:port`、`ip:port` 或 `domain.com` 格式
   - **重要：** 不要包含 `http://` 或 `https://` 协议前缀
@@ -271,6 +289,56 @@ systemctl restart gerrit
 - `s3.disableSslVerify`：禁用 SSL 验证（默认：`false`，对于没有 SSL 的本地 MinIO/RustFS 设置为 `true`）
 - `s3.accessKey`：访问密钥（MinIO/RustFS 访问密钥或 Amazon IAM 访问密钥，建议放在安全配置中）
 - `s3.secretKey`：密钥（MinIO/RustFS 密钥或 Amazon IAM 密钥，建议放在安全配置中）
+
+### Gerrit 2.13 特殊配置
+
+**重要提示：** Gerrit 2.13 使用 JGit LFS 4.5.0，该版本在自定义 S3 端点方面有限制。需要额外配置：
+
+1. **在 `lfs.config` 中的凭据（必需）：**
+   - 对于 Gerrit 2.13，`accessKey` 和 `secretKey`**必须**直接放在 `lfs.config` 中（而不是 `lfs.secure.config`）
+   - 这是因为 Gerrit 2.13.9 的 `PluginConfigFactory` 不会正确合并安全配置文件
+   - 示例：
+     ```
+     [s3 "rustfs"]
+         hostname = your-domain.com
+         region = us-east-1
+         bucket = gerritlfs
+         storageClass = REDUCED_REDUNDANCY
+         expirationSeconds = 60
+         disableSslVerify = true
+         accessKey = YOUR_ACCESS_KEY
+         secretKey = YOUR_SECRET_KEY
+     ```
+
+2. **服务器端 `/etc/hosts` 映射（必需）：**
+   ```bash
+   # 在 Gerrit 服务器上
+   echo "YOUR_S3_SERVER_IP  your-domain.com s3-us-east-1.amazonaws.com" | sudo tee -a /etc/hosts
+   ```
+
+3. **客户端 `/etc/hosts` 映射（必需）：**
+   ```bash
+   # 在客户端机器上（运行 git push 的地方）
+   echo "YOUR_S3_SERVER_IP  your-domain.com s3-us-east-1.amazonaws.com" | sudo tee -a /etc/hosts
+   ```
+
+4. **Nginx 配置（使用反向代理时必需）：**
+   - 必须接受两个主机名：`server_name your-domain.com s3-us-east-1.amazonaws.com;`
+   - 必须保留原始 Host 头：`proxy_set_header Host $http_host;`
+   - 参见上面的 nginx 配置示例
+
+5. **客户端 git-lfs SSL 配置（必需）：**
+   ```bash
+   # 由于证书主机名不匹配，跳过 SSL 验证
+   export GIT_SSL_NO_VERIFY=1
+   # 或
+   git config lfs.https://s3-us-east-1.amazonaws.com/.sslverify false
+   ```
+
+6. **禁用 S3 端点的代理（如果使用代理）：**
+   ```bash
+   export no_proxy="your-domain.com,s3-us-east-1.amazonaws.com,YOUR_S3_SERVER_IP,localhost,127.0.0.1"
+   ```
 
 ### 3. All-Projects/refs/meta/config/lfs.config
 
@@ -635,16 +703,18 @@ docker run -d \
 
 对于生产部署，使用 nginx 作为 RustFS 前面的反向代理来处理 SSL 终止。nginx 配置应在根路径 (`/`) 提供 RustFS S3 API，并公开 RustFS 控制台路径。
 
+**对于 Gerrit 2.13：** nginx 配置必须接受您的自定义域名和 `s3-us-east-1.amazonaws.com` 作为服务器名称，以支持预签名 URL。请参见下面的配置。
+
 ```nginx
 server {
     listen 80;
-    server_name your-domain.com;
+    server_name your-domain.com s3-us-east-1.amazonaws.com;
     return 301 https://$host$request_uri;
 }
 
 server {
     listen 443 ssl;
-    server_name your-domain.com;
+    server_name your-domain.com s3-us-east-1.amazonaws.com;
 
     ssl_certificate /etc/nginx/certs/public.crt;
     ssl_certificate_key /etc/nginx/certs/private.key;
@@ -720,6 +790,7 @@ server {
 - `lfs.config` 中的 `hostname` 应仅设置为您的域名（例如，`your-domain.com`）
 - 不要在主机名配置中包含路径前缀
 - Nginx 处理 SSL 终止，因此 RustFS 在 nginx 后运行时可以不需要 SSL 证书
+- **对于 Gerrit 2.13：** `server_name` 必须包含您的域名和 `s3-us-east-1.amazonaws.com`，并且必须保留 `Host` 头（如上所示）才能使 S3 签名验证正常工作
 
 ### 为 RustFS 生成 SSL 证书
 
@@ -798,19 +869,35 @@ git config lfs.http://127.0.0.1:8080/a/test-repo/info/lfs.locksverify true
 # 存储 credential (~/.git-credentials)
 git config credential.helper store
 
-# 对于自签名证书，将证书添加到系统信任存储（推荐）
-# 这是必需的，因为 git-lfs 使用预签名 URL 直接上传到 RustFS
-# 并且默认不信任自签名证书
+# 对于自签名证书或自定义主机名（Gerrit 2.13），配置 git-lfs SSL 验证
+# 这是必需的，因为 git-lfs 使用预签名 URL 直接上传到 S3
+# 并且默认不信任自签名证书或不匹配的主机名
 #
-# 步骤 1：从 RustFS 服务器复制证书到本地机器
+# 选项 1：跳过 S3 端点的 SSL 验证（用于测试或使用 /etc/hosts 映射时）
+export GIT_SSL_NO_VERIFY=1
+# 或
+git config lfs.https://s3-us-east-1.amazonaws.com/.sslverify false
+
+# 选项 2：将证书添加到系统信任存储（推荐用于生产环境）
+# 步骤 1：从 S3 服务器复制证书到本地机器
+# 对于 MinIO：
+scp user@minio-server:/path/to/minio/certs/public.crt /tmp/minio.crt
+# 对于 RustFS：
 scp user@rustfs-server:/path/to/rustfs/certs/public.crt /tmp/rustfs.crt
 
 # 步骤 2：将证书添加到系统信任存储
+sudo cp /tmp/minio.crt /usr/local/share/ca-certificates/minio.crt
+# 或对于 RustFS：
 sudo cp /tmp/rustfs.crt /usr/local/share/ca-certificates/rustfs.crt
 sudo update-ca-certificates
 
 # 步骤 3：验证证书已添加
+ls -la /etc/ssl/certs/ | grep minio
+# 或对于 RustFS：
 ls -la /etc/ssl/certs/ | grep rustfs
+
+# 对于 Gerrit 2.13：还要在客户端机器上添加 /etc/hosts 映射
+echo "YOUR_S3_SERVER_IP  your-domain.com s3-us-east-1.amazonaws.com" | sudo tee -a /etc/hosts
 
 # 验证 LFS 已配置
 git ls-remote http://127.0.0.1:8080/a/test-repo
@@ -920,7 +1007,35 @@ cat .git/lfs/logs/YYYYMMDDTHHMMSS.XXXXXXXX.log
      - ✅ 正确：`hostname = your-domain.com`
      - 配置 nginx 在根路径 (`/`) 提供 S3 API，而不是子路径
 
-6. **将 lfs.config 添加到 All-Projects.git 裸仓库（Gerrit 2.13）**
+6. **"UnknownHostException: s3-us-east-1.amazonaws.com: Name or service not known"（Gerrit 2.13）**
+   - **问题：** Gerrit 2.13 使用 JGit LFS 4.5.0，该版本不原生支持自定义端点。S3 客户端从区域构造端点（例如，`s3-us-east-1.amazonaws.com`），而不是使用配置的 `hostname`。
+   - **解决方案：** 在 Gerrit 服务器和客户端机器上使用 `/etc/hosts` 映射：
+     ```bash
+     # 在 Gerrit 服务器上
+     echo "YOUR_RUSTFS_IP  your-domain.com s3-us-east-1.amazonaws.com" | sudo tee -a /etc/hosts
+
+     # 在客户端机器上（运行 git push 的地方）
+     echo "YOUR_RUSTFS_IP  your-domain.com s3-us-east-1.amazonaws.com" | sudo tee -a /etc/hosts
+     ```
+   - **还需要：**
+     - 配置 nginx 接受 `s3-us-east-1.amazonaws.com` 作为服务器名称（参见上面的 nginx 配置）
+     - 配置 nginx 保留原始 `Host` 头以进行 S3 签名验证
+     - 配置 git-lfs 跳过 SSL 验证（证书不匹配）：
+       ```bash
+       export GIT_SSL_NO_VERIFY=1
+       # 或
+       git config lfs.https://s3-us-east-1.amazonaws.com/.sslverify false
+       ```
+
+7. **"SignatureDoesNotMatch" 错误（Gerrit 2.13 与 RustFS/MinIO）**
+   - **问题：** S3 预签名 URL 在签名中包含主机名。当 Gerrit 为 `s3-us-east-1.amazonaws.com` 生成 URL 但请求发送到您的自定义域名时，签名验证失败。
+   - **解决方案：**
+     - 配置 nginx 保留原始 `Host` 头：`proxy_set_header Host $http_host;`
+     - 确保 nginx 接受两个主机名：`server_name your-domain.com s3-us-east-1.amazonaws.com;`
+     - 确保 `/etc/hosts` 映射在服务器和客户端上都正确
+   - 如果错误仍然存在，请检查 RustFS/MinIO 日志以获取详细的签名验证错误
+
+8. **将 lfs.config 添加到 All-Projects.git 裸仓库（Gerrit 2.13）**
    - **问题：** 当由于权限问题（例如，"You are not allowed to perform this operation"）无法通过 HTTP 推送 `lfs.config` 时，需要直接在服务器上的裸仓库中添加它。
    - **解决方案：** 使用 `2.13/` 目录中提供的 `transfer-commit.sh` 脚本。
    - **步骤：**
