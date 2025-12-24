@@ -332,9 +332,21 @@ Or for RustFS:
    ```
 
 6. **Disable proxy for S3 endpoints (if using proxy):**
+
+   **Option 1: Clear proxy environment variables (Recommended if proxy is not needed):**
+   ```bash
+   export https_proxy=
+   export http_proxy=
+   export HTTPS_PROXY=
+   export HTTP_PROXY=
+   ```
+
+   **Option 2: Add S3 endpoints to no_proxy:**
    ```bash
    export no_proxy="your-domain.com,s3-us-east-1.amazonaws.com,YOUR_S3_SERVER_IP,localhost,127.0.0.1"
    ```
+
+   **Note:** If you're getting EOF errors when pushing LFS files, try clearing proxy environment variables first. Git LFS may try to use the proxy for S3 connections, which can cause connection failures even with `/etc/hosts` mapping.
 
 ### 3. All-Projects/refs/meta/config/lfs.config
 
@@ -860,7 +872,6 @@ cd test-repo
 
 # Configure LFS
 git config lfs.url http://127.0.0.1:8080/a/test-repo/info/lfs
-git config lfs.http://127.0.0.1:8080/a/test-repo/info/lfs.locksverify true
 
 # Store credential (~/.git-credentials)
 git config credential.helper store
@@ -1022,8 +1033,33 @@ cat .git/lfs/logs/YYYYMMDDTHHMMSS.XXXXXXXX.log
        # OR
        git config lfs.https://s3-us-east-1.amazonaws.com/.sslverify false
        ```
+     - **Clear proxy environment variables (if proxy is causing issues):**
+       ```bash
+       export https_proxy=
+       export http_proxy=
+       export HTTPS_PROXY=
+       export HTTP_PROXY=
+       ```
 
-7. **"SignatureDoesNotMatch" Error (Gerrit 2.13 with RustFS/MinIO)**
+7. **"LFS: Put ... EOF" Error (Gerrit 2.13)**
+   - **Problem:** Git LFS upload fails with EOF error when pushing files, even after configuring `/etc/hosts` mapping.
+   - **Solution:** Clear proxy environment variables. Git LFS may try to use system proxy for S3 connections, which can interfere with `/etc/hosts` mapping:
+     ```bash
+     # Clear all proxy environment variables
+     export https_proxy=
+     export http_proxy=
+     export HTTPS_PROXY=
+     export HTTP_PROXY=
+
+     # Then retry git push
+     git push origin HEAD:refs/for/master
+     ```
+   - **Alternative:** If you need to keep proxy for other services, add S3 endpoints to `no_proxy`:
+     ```bash
+     export no_proxy="your-domain.com,s3-us-east-1.amazonaws.com,YOUR_S3_SERVER_IP,localhost,127.0.0.1"
+     ```
+
+8. **"SignatureDoesNotMatch" Error (Gerrit 2.13 with RustFS/MinIO)**
    - **Problem:** S3 presigned URLs include the hostname in the signature. When Gerrit generates URLs for `s3-us-east-1.amazonaws.com` but requests go to your custom domain, signature validation fails.
    - **Solution:**
      - Configure nginx to preserve the original `Host` header: `proxy_set_header Host $http_host;`
@@ -1031,7 +1067,7 @@ cat .git/lfs/logs/YYYYMMDDTHHMMSS.XXXXXXXX.log
      - Ensure `/etc/hosts` mapping is correct on both server and client
    - If the error persists, check RustFS/MinIO logs for detailed signature validation errors
 
-8. **Adding lfs.config to All-Projects.git Bare Repository (Gerrit 2.13)**
+9. **Adding lfs.config to All-Projects.git Bare Repository (Gerrit 2.13)**
    - **Problem:** When you cannot push `lfs.config` via HTTP due to permission issues (e.g., "You are not allowed to perform this operation"), you need to add it directly to the bare repository on the server.
    - **Solution:** Use the `transfer-commit.sh` script provided in the `2.13/` directory.
    - **Steps:**

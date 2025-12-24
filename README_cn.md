@@ -336,9 +336,21 @@ systemctl restart gerrit
    ```
 
 6. **禁用 S3 端点的代理（如果使用代理）：**
+
+   **选项 1：清空代理环境变量（如果不需要代理，推荐）：**
+   ```bash
+   export https_proxy=
+   export http_proxy=
+   export HTTPS_PROXY=
+   export HTTP_PROXY=
+   ```
+
+   **选项 2：将 S3 端点添加到 no_proxy：**
    ```bash
    export no_proxy="your-domain.com,s3-us-east-1.amazonaws.com,YOUR_S3_SERVER_IP,localhost,127.0.0.1"
    ```
+
+   **注意：** 如果您在推送 LFS 文件时遇到 EOF 错误，请先尝试清空代理环境变量。Git LFS 可能会尝试使用代理进行 S3 连接，即使配置了 `/etc/hosts` 映射也可能导致连接失败。
 
 ### 3. All-Projects/refs/meta/config/lfs.config
 
@@ -864,7 +876,6 @@ cd test-repo
 
 # 配置 LFS
 git config lfs.url http://127.0.0.1:8080/a/test-repo/info/lfs
-git config lfs.http://127.0.0.1:8080/a/test-repo/info/lfs.locksverify true
 
 # 存储 credential (~/.git-credentials)
 git config credential.helper store
@@ -1026,8 +1037,33 @@ cat .git/lfs/logs/YYYYMMDDTHHMMSS.XXXXXXXX.log
        # 或
        git config lfs.https://s3-us-east-1.amazonaws.com/.sslverify false
        ```
+     - **清空代理环境变量（如果代理导致问题）：**
+       ```bash
+       export https_proxy=
+       export http_proxy=
+       export HTTPS_PROXY=
+       export HTTP_PROXY=
+       ```
 
-7. **"SignatureDoesNotMatch" 错误（Gerrit 2.13 与 RustFS/MinIO）**
+7. **"LFS: Put ... EOF" 错误（Gerrit 2.13）**
+   - **问题：** 即使在配置了 `/etc/hosts` 映射后，推送文件时 Git LFS 上传仍失败并出现 EOF 错误。
+   - **解决方案：** 清空代理环境变量。Git LFS 可能会尝试使用系统代理进行 S3 连接，这可能会干扰 `/etc/hosts` 映射：
+     ```bash
+     # 清空所有代理环境变量
+     export https_proxy=
+     export http_proxy=
+     export HTTPS_PROXY=
+     export HTTP_PROXY=
+
+     # 然后重试 git push
+     git push origin HEAD:refs/for/master
+     ```
+   - **替代方案：** 如果您需要为其他服务保留代理，请将 S3 端点添加到 `no_proxy`：
+     ```bash
+     export no_proxy="your-domain.com,s3-us-east-1.amazonaws.com,YOUR_S3_SERVER_IP,localhost,127.0.0.1"
+     ```
+
+8. **"SignatureDoesNotMatch" 错误（Gerrit 2.13 与 RustFS/MinIO）**
    - **问题：** S3 预签名 URL 在签名中包含主机名。当 Gerrit 为 `s3-us-east-1.amazonaws.com` 生成 URL 但请求发送到您的自定义域名时，签名验证失败。
    - **解决方案：**
      - 配置 nginx 保留原始 `Host` 头：`proxy_set_header Host $http_host;`
@@ -1035,7 +1071,7 @@ cat .git/lfs/logs/YYYYMMDDTHHMMSS.XXXXXXXX.log
      - 确保 `/etc/hosts` 映射在服务器和客户端上都正确
    - 如果错误仍然存在，请检查 RustFS/MinIO 日志以获取详细的签名验证错误
 
-8. **将 lfs.config 添加到 All-Projects.git 裸仓库（Gerrit 2.13）**
+9. **将 lfs.config 添加到 All-Projects.git 裸仓库（Gerrit 2.13）**
    - **问题：** 当由于权限问题（例如，"You are not allowed to perform this operation"）无法通过 HTTP 推送 `lfs.config` 时，需要直接在服务器上的裸仓库中添加它。
    - **解决方案：** 使用 `2.13/` 目录中提供的 `transfer-commit.sh` 脚本。
    - **步骤：**
