@@ -6,14 +6,7 @@ REPO = MAVEN_CENTRAL
 
 gerrit_plugin(
   name = 'lfs',
-  srcs = glob(
-    ['src/main/java/**/*.java'],
-    excludes = [
-      'src/main/java/**/SshModule.java',
-      'src/main/java/**/LfsSshAuth.java',
-      'src/main/java/**/LfsSshRequestAuthorizer.java',
-    ]
-  ),
+  srcs = glob(['src/main/java/**/*.java']),
   resources = glob(['src/main/resources/**/*']),
   deps = [
     ':jgit-http-apache',
@@ -25,6 +18,7 @@ gerrit_plugin(
     'Gerrit-PluginName: lfs',
     'Gerrit-Module: com.googlesource.gerrit.plugins.lfs.Module',
     'Gerrit-HttpModule: com.googlesource.gerrit.plugins.lfs.HttpModule',
+    'Gerrit-SshModule: com.googlesource.gerrit.plugins.lfs.SshModule',
     'Gerrit-InitStep: com.googlesource.gerrit.plugins.lfs.InitLfs',
   ],
 )

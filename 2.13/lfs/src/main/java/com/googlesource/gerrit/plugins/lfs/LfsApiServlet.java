@@ -44,7 +44,7 @@ import java.util.regex.Pattern;
 @Singleton
 public class LfsApiServlet extends LfsGerritProtocolServlet {
   private static final long serialVersionUID = 1L;
-  private static final String URL_REGEX = "(?:/p/|/)(.+)";
+  private static final String URL_REGEX = "(?:/p/|/a/|/)(.+?)(?:/info/lfs/.*|$)";
   private static final Pattern URL_PATTERN = Pattern.compile(URL_REGEX);
   private static final String DOWNLOAD = "download";
   private static final String UPLOAD = "upload";

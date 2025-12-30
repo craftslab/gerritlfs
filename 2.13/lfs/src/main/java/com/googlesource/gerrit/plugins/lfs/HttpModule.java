@@ -50,7 +50,7 @@ public class HttpModule extends HttpPluginModule {
 
   @Override
   protected void configureServlets() {
-    serveRegex("(?:/p/|/)(.+)").with(LfsApiServlet.class);
+    serveRegex("(?:/p/|/a/|/)(.+?)/info/lfs/.*").with(LfsApiServlet.class);
     populateRepository(defaultBackend);
     for (LfsBackend backend : backends.values()) {
       populateRepository(backend);
