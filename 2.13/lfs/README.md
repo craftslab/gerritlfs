@@ -52,6 +52,14 @@ EOF
 - `bucklets/gerrit_plugin.bucklet`: use `allow_unsafe_import()` for `multiprocessing` and `os`.
 - `BUCK`: removed unsupported `source_under_test` arg in `java_test` for current Buck.
 
+## Version Configuration
+The plugin version is defined in the `VERSION` file. To change the version:
+```bash
+# Edit VERSION file and set PLUGIN_VERSION
+echo "PLUGIN_VERSION = 'v2.13.9-20251230'" > VERSION
+```
+The version will be included in the manifest as `Implementation-Version` when building the plugin.
+
 ## Build
 ```bash
 # From /home/lemonjia/my-tmp/lfs-2.13
