@@ -14,11 +14,6 @@
 
 package com.googlesource.gerrit.plugins.lfs;
 
-import static com.google.gerrit.httpd.plugins.LfsPluginServlet.URL_REGEX;
-
-import com.google.gerrit.extensions.registration.DynamicSet;
-import com.google.gerrit.extensions.webui.JavaScriptPlugin;
-import com.google.gerrit.extensions.webui.WebUiPlugin;
 import com.google.gerrit.httpd.plugins.HttpPluginModule;
 import com.google.inject.Inject;
 
@@ -55,14 +50,11 @@ public class HttpModule extends HttpPluginModule {
 
   @Override
   protected void configureServlets() {
-    serveRegex(URL_REGEX).with(LfsApiServlet.class);
+    serveRegex("(?:/p/|/)(.+)").with(LfsApiServlet.class);
     populateRepository(defaultBackend);
     for (LfsBackend backend : backends.values()) {
       populateRepository(backend);
     }
-
-    DynamicSet.bind(binder(), WebUiPlugin.class)
-      .toInstance(new JavaScriptPlugin("lfs-project-info.js"));
   }
 
   private void populateRepository(LfsBackend backend) {

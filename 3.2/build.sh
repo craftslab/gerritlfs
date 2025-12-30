@@ -1,3 +1,3 @@
 #!/bin/bash
 
-docker build -t gerrit-plugins-lfs:3.2 .
+docker build --no-cache -t gerrit-plugins-lfs:3.2 .

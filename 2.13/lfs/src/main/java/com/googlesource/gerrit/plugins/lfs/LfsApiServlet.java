@@ -16,7 +16,6 @@ package com.googlesource.gerrit.plugins.lfs;
 
 import static com.google.gerrit.extensions.client.ProjectState.HIDDEN;
 import static com.google.gerrit.extensions.client.ProjectState.READ_ONLY;
-import static com.google.gerrit.httpd.plugins.LfsPluginServlet.URL_REGEX;
 
 import com.google.common.base.Strings;
 import com.google.gerrit.common.ProjectUtil;
@@ -45,6 +44,7 @@ import java.util.regex.Pattern;
 @Singleton
 public class LfsApiServlet extends LfsGerritProtocolServlet {
   private static final long serialVersionUID = 1L;
+  private static final String URL_REGEX = "(?:/p/|/)(.+)";
   private static final Pattern URL_PATTERN = Pattern.compile(URL_REGEX);
   private static final String DOWNLOAD = "download";
   private static final String UPLOAD = "upload";
