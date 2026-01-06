@@ -898,7 +898,7 @@ scp user@rustfs-server:/path/to/rustfs/certs/public.crt /tmp/rustfs.crt
 # Option 3: Set up local git alias for push with SSL verification disabled (RECOMMENDED)
 # This creates a local alias in .git/config (not global), so it only affects this repository
 # Note: In git-lfs 3.4+, sslverify config may not work reliably, so using alias with env var is recommended
-git config --local alias.push-lfs '!GIT_SSL_NO_VERIFY=1 GIT_LFS_SKIP_SSL_VERIFY=1 git push'
+git config alias.push-lfs '!GIT_SSL_NO_VERIFY=1 GIT_LFS_SKIP_SSL_VERIFY=1 git push'
 
 # Step 2: Add certificate to system trust store
 sudo cp /tmp/minio.crt /usr/local/share/ca-certificates/minio.crt
@@ -1002,7 +1002,7 @@ cat .git/lfs/logs/YYYYMMDDTHHMMSS.XXXXXXXX.log
        git config lfs.https://rustfs_ip:9002/.sslverify false
 
        # Method 3: Try setting git alias
-       git config --global alias.push-lfs '!GIT_SSL_NO_VERIFY=1 GIT_LFS_SKIP_SSL_VERIFY=1 git push'
+       git config alias.push-lfs '!GIT_SSL_NO_VERIFY=1 GIT_LFS_SKIP_SSL_VERIFY=1 git push'
        ```
    - Verify `disableSslVerify = true` in `lfs.config` when using self-signed certificates (this only affects Gerrit's connection, not git-lfs)
    - Check that hostname in `lfs.config` does NOT include `http://` or `https://` prefix
@@ -1057,7 +1057,7 @@ cat .git/lfs/logs/YYYYMMDDTHHMMSS.XXXXXXXX.log
        git config lfs.https://s3-us-east-1.amazonaws.com/.sslverify false
 
        # Method 3: Try setting git alias
-       git config --global alias.push-lfs '!GIT_SSL_NO_VERIFY=1 GIT_LFS_SKIP_SSL_VERIFY=1 git push'
+       git config alias.push-lfs '!GIT_SSL_NO_VERIFY=1 GIT_LFS_SKIP_SSL_VERIFY=1 git push'
        ```
      - **Clear proxy environment variables (if proxy is causing issues):**
        ```bash

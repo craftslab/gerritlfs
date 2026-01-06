@@ -902,7 +902,7 @@ scp user@rustfs-server:/path/to/rustfs/certs/public.crt /tmp/rustfs.crt
 # 选项 3：设置本地 git 别名用于推送时禁用 SSL 验证（推荐）
 # 这会在 .git/config 中创建本地别名（不是全局），因此仅影响此仓库
 # 注意：在 git-lfs 3.4+ 中，sslverify 配置可能不可靠，因此推荐使用带环境变量的别名
-git config --local alias.push-lfs '!GIT_SSL_NO_VERIFY=1 GIT_LFS_SKIP_SSL_VERIFY=1 git push'
+git config alias.push-lfs '!GIT_SSL_NO_VERIFY=1 GIT_LFS_SKIP_SSL_VERIFY=1 git push'
 
 # 步骤 2：将证书添加到系统信任存储
 sudo cp /tmp/minio.crt /usr/local/share/ca-certificates/minio.crt
@@ -1006,7 +1006,7 @@ cat .git/lfs/logs/YYYYMMDDTHHMMSS.XXXXXXXX.log
        git config lfs.https://rustfs_ip:9002/.sslverify false
 
        # 方法 3：尝试设置 git 别名
-       git config --global alias.push-lfs '!GIT_SSL_NO_VERIFY=1 GIT_LFS_SKIP_SSL_VERIFY=1 git push'
+       git config alias.push-lfs '!GIT_SSL_NO_VERIFY=1 GIT_LFS_SKIP_SSL_VERIFY=1 git push'
        ```
    - 使用自签名证书时，验证 `lfs.config` 中的 `disableSslVerify = true`（这仅影响 Gerrit 的连接，不影响 git-lfs）
    - 检查 `lfs.config` 中的主机名是否不包含 `http://` 或 `https://` 前缀
@@ -1061,7 +1061,7 @@ cat .git/lfs/logs/YYYYMMDDTHHMMSS.XXXXXXXX.log
        git config lfs.https://s3-us-east-1.amazonaws.com/.sslverify false
 
        # 方法 3：尝试设置 git 别名
-       git config --global alias.push-lfs '!GIT_SSL_NO_VERIFY=1 GIT_LFS_SKIP_SSL_VERIFY=1 git push'
+       git config alias.push-lfs '!GIT_SSL_NO_VERIFY=1 GIT_LFS_SKIP_SSL_VERIFY=1 git push'
        ```
      - **清空代理环境变量（如果代理导致问题）：**
        ```bash
