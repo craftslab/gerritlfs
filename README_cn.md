@@ -330,8 +330,11 @@ systemctl restart gerrit
 5. **客户端 git-lfs SSL 配置（必需）：**
    ```bash
    # 由于证书主机名不匹配，跳过 SSL 验证
+   # 注意：git-lfs 3.4+ 中，sslverify 配置可能不可靠，推荐使用环境变量
    export GIT_SSL_NO_VERIFY=1
-   # 或
+   # 或使用 GIT_LFS_SKIP_SSL_VERIFY（git-lfs 专用）
+   export GIT_LFS_SKIP_SSL_VERIFY=1
+   # 或尝试配置（在 git-lfs 3.4+ 中可能不工作）
    git config lfs.https://s3-us-east-1.amazonaws.com/.sslverify false
    ```
 
@@ -896,6 +899,11 @@ scp user@minio-server:/path/to/minio/certs/public.crt /tmp/minio.crt
 # 对于 RustFS：
 scp user@rustfs-server:/path/to/rustfs/certs/public.crt /tmp/rustfs.crt
 
+# 选项 3：设置本地 git 别名用于推送时禁用 SSL 验证（推荐）
+# 这会在 .git/config 中创建本地别名（不是全局），因此仅影响此仓库
+# 注意：在 git-lfs 3.4+ 中，sslverify 配置可能不可靠，因此推荐使用带环境变量的别名
+git config --local alias.push-lfs '!GIT_SSL_NO_VERIFY=1 GIT_LFS_SKIP_SSL_VERIFY=1 git push'
+
 # 步骤 2：将证书添加到系统信任存储
 sudo cp /tmp/minio.crt /usr/local/share/ca-certificates/minio.crt
 # 或对于 RustFS：
@@ -923,7 +931,12 @@ git commit -m "Configure Git LFS tracking with S3 backend"
 # 推送 LFS 文件（将存储在 S3 兼容的存储服务器上）
 git add large-file.bin
 git commit -m "Add large binary file (stored on S3 backend)"
-git push origin HEAD:refs/for/master
+
+# 使用别名推送（自动为 git-lfs 设置 GIT_SSL_NO_VERIFY=1）
+git push-lfs origin HEAD:refs/for/master
+
+# 或正常推送（需要在环境中设置 GIT_SSL_NO_VERIFY=1）
+# git push origin HEAD:refs/for/master
 
 # 验证 LFS 文件已上传到 S3 后端
 # 文件应该在 S3 服务器上可访问
@@ -982,13 +995,19 @@ cat .git/lfs/logs/YYYYMMDDTHHMMSS.XXXXXXXX.log
        之后，git-lfs 将信任证书，您可以推送而不会出错。
      - **替代方案（仅用于测试）：** 环境变量或 git 配置（可能不适用于所有 git-lfs 版本）：
        ```bash
-       export GIT_LFS_SKIP_SSL_VERIFY=1
+       # 方法 1：使用环境变量（推荐，在 git-lfs 3.4+ 中可靠）
+       export GIT_SSL_NO_VERIFY=1
        # 或
+       export GIT_LFS_SKIP_SSL_VERIFY=1
+
+       # 方法 2：尝试配置（在 git-lfs 3.4+ 中可能不工作）
        git config lfs.https://minio_ip:9000/.sslverify false
        # 或对于 RustFS：
        git config lfs.https://rustfs_ip:9002/.sslverify false
+
+       # 方法 3：尝试设置 git 别名
+       git config --global alias.push-lfs '!GIT_SSL_NO_VERIFY=1 GIT_LFS_SKIP_SSL_VERIFY=1 git push'
        ```
-       **注意：** 这些方法可能无法在 git-lfs 3.4+ 中可靠工作。添加到信任存储是推荐的解决方案。
    - 使用自签名证书时，验证 `lfs.config` 中的 `disableSslVerify = true`（这仅影响 Gerrit 的连接，不影响 git-lfs）
    - 检查 `lfs.config` 中的主机名是否不包含 `http://` 或 `https://` 前缀
 
@@ -1033,9 +1052,16 @@ cat .git/lfs/logs/YYYYMMDDTHHMMSS.XXXXXXXX.log
      - 配置 nginx 保留原始 `Host` 头以进行 S3 签名验证
      - 配置 git-lfs 跳过 SSL 验证（证书不匹配）：
        ```bash
+       # 方法 1：使用环境变量（推荐，在 git-lfs 3.4+ 中可靠）
        export GIT_SSL_NO_VERIFY=1
        # 或
+       export GIT_LFS_SKIP_SSL_VERIFY=1
+
+       # 方法 2：尝试配置（在 git-lfs 3.4+ 中可能不工作）
        git config lfs.https://s3-us-east-1.amazonaws.com/.sslverify false
+
+       # 方法 3：尝试设置 git 别名
+       git config --global alias.push-lfs '!GIT_SSL_NO_VERIFY=1 GIT_LFS_SKIP_SSL_VERIFY=1 git push'
        ```
      - **清空代理环境变量（如果代理导致问题）：**
        ```bash

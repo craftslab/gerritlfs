@@ -326,8 +326,11 @@ Or for RustFS:
 5. **Client-side git-lfs SSL configuration (REQUIRED):**
    ```bash
    # Skip SSL verification due to certificate hostname mismatch
+   # Note: In git-lfs 3.4+, sslverify config may not work reliably, use environment variable instead
    export GIT_SSL_NO_VERIFY=1
-   # OR
+   # OR use GIT_LFS_SKIP_SSL_VERIFY (git-lfs specific)
+   export GIT_LFS_SKIP_SSL_VERIFY=1
+   # OR try config (may not work in git-lfs 3.4+)
    git config lfs.https://s3-us-east-1.amazonaws.com/.sslverify false
    ```
 
@@ -892,6 +895,11 @@ scp user@minio-server:/path/to/minio/certs/public.crt /tmp/minio.crt
 # For RustFS:
 scp user@rustfs-server:/path/to/rustfs/certs/public.crt /tmp/rustfs.crt
 
+# Option 3: Set up local git alias for push with SSL verification disabled (RECOMMENDED)
+# This creates a local alias in .git/config (not global), so it only affects this repository
+# Note: In git-lfs 3.4+, sslverify config may not work reliably, so using alias with env var is recommended
+git config --local alias.push-lfs '!GIT_SSL_NO_VERIFY=1 GIT_LFS_SKIP_SSL_VERIFY=1 git push'
+
 # Step 2: Add certificate to system trust store
 sudo cp /tmp/minio.crt /usr/local/share/ca-certificates/minio.crt
 # OR for RustFS:
@@ -919,7 +927,12 @@ git commit -m "Configure Git LFS tracking with S3 backend"
 # Push LFS files (will be stored on S3-compatible storage server)
 git add large-file.bin
 git commit -m "Add large binary file (stored on S3 backend)"
-git push origin HEAD:refs/for/master
+
+# Push using the alias (automatically sets GIT_SSL_NO_VERIFY=1 for git-lfs)
+git push-lfs origin HEAD:refs/for/master
+
+# OR push normally (requires GIT_SSL_NO_VERIFY=1 to be set in environment)
+# git push origin HEAD:refs/for/master
 
 # Verify LFS file was uploaded to S3 backend
 # The file should be accessible on S3 server
@@ -976,15 +989,21 @@ cat .git/lfs/logs/YYYYMMDDTHHMMSS.XXXXXXXX.log
        ls -la /etc/ssl/certs/ | grep rustfs
        ```
        After this, git-lfs will trust the certificate and you can push without errors.
-     - **Alternative (Testing only):** Environment variable or git config (may not work with all git-lfs versions):
+     - **Alternative (Testing only):** Environment variable or git config:
        ```bash
-       export GIT_LFS_SKIP_SSL_VERIFY=1
+       # Method 1: Use environment variable (Recommended, reliable in git-lfs 3.4+)
+       export GIT_SSL_NO_VERIFY=1
        # OR
+       export GIT_LFS_SKIP_SSL_VERIFY=1
+
+       # Method 2: Try config (may not work in git-lfs 3.4+)
        git config lfs.https://minio_ip:9000/.sslverify false
        # OR for RustFS:
        git config lfs.https://rustfs_ip:9002/.sslverify false
+
+       # Method 3: Try setting git alias
+       git config --global alias.push-lfs '!GIT_SSL_NO_VERIFY=1 GIT_LFS_SKIP_SSL_VERIFY=1 git push'
        ```
-       **Note:** These methods may not work reliably with git-lfs 3.4+. Adding to trust store is the recommended solution.
    - Verify `disableSslVerify = true` in `lfs.config` when using self-signed certificates (this only affects Gerrit's connection, not git-lfs)
    - Check that hostname in `lfs.config` does NOT include `http://` or `https://` prefix
 
@@ -1029,9 +1048,16 @@ cat .git/lfs/logs/YYYYMMDDTHHMMSS.XXXXXXXX.log
      - Configure nginx to preserve the original `Host` header for S3 signature validation
      - Configure git-lfs to skip SSL verification (certificate mismatch):
        ```bash
+       # Method 1: Use environment variable (Recommended, reliable in git-lfs 3.4+)
        export GIT_SSL_NO_VERIFY=1
        # OR
+       export GIT_LFS_SKIP_SSL_VERIFY=1
+
+       # Method 2: Try config (may not work in git-lfs 3.4+)
        git config lfs.https://s3-us-east-1.amazonaws.com/.sslverify false
+
+       # Method 3: Try setting git alias
+       git config --global alias.push-lfs '!GIT_SSL_NO_VERIFY=1 GIT_LFS_SKIP_SSL_VERIFY=1 git push'
        ```
      - **Clear proxy environment variables (if proxy is causing issues):**
        ```bash
