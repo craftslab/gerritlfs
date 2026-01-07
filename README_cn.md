@@ -872,6 +872,8 @@ mc du myrustfs/gerritlfs
 
 ## 使用
 
+### 克隆和推送 LFS 文件至 S3 存储
+
 ```bash
 # 克隆仓库
 git clone http://127.0.0.1:8080/a/test-repo
@@ -943,6 +945,72 @@ git push-lfs origin HEAD:refs/for/master
 # - 对于 MinIO：在 http://localhost:9001 检查 MinIO 控制台
 # - 对于 RustFS：在 http://localhost:9003 检查 RustFS 控制台
 git lfs ls-files
+```
+
+### 从 S3 存储克隆和拉取 LFS 文件
+
+当克隆或拉取已包含存储在 S3 中的 LFS 文件的仓库时，需要配置 git-lfs 以访问 S3 存储后端：
+
+```bash
+# 克隆包含 LFS 文件的仓库
+git clone http://127.0.0.1:8080/a/test-repo
+cd test-repo
+
+# 配置 LFS URL（LFS 操作所必需）
+git config lfs.url http://127.0.0.1:8080/a/test-repo/info/lfs
+
+# 存储凭据以进行身份验证
+git config credential.helper store
+
+# 对于 Gerrit 2.13：在客户端机器上配置 /etc/hosts 映射（必需）
+# 这是必需的，因为 Gerrit 2.13 使用 JGit LFS 4.5.0，它从区域构造
+# S3 端点，而不是使用配置的主机名
+echo "YOUR_S3_SERVER_IP  your-domain.com s3-us-east-1.amazonaws.com" | sudo tee -a /etc/hosts
+
+# 为 S3 端点配置 git-lfs SSL 验证
+# 这是必需的，因为 git-lfs 使用预签名 URL 直接从 S3 下载
+# 并且默认不信任自签名证书或不匹配的主机名
+#
+# 选项 1：跳过 SSL 验证（用于测试或使用 /etc/hosts 映射时）
+export GIT_SSL_NO_VERIFY=1
+# 或
+export GIT_LFS_SKIP_SSL_VERIFY=1
+# 或
+git config lfs.https://s3-us-east-1.amazonaws.com/.sslverify false
+
+# 选项 2：将证书添加到系统信任存储（推荐用于生产环境）
+# 步骤 1：从 S3 服务器复制证书到本地机器
+# 对于 MinIO：
+scp user@minio-server:/path/to/minio/certs/public.crt /tmp/minio.crt
+# 对于 RustFS：
+scp user@rustfs-server:/path/to/rustfs/certs/public.crt /tmp/rustfs.crt
+
+# 步骤 2：将证书添加到系统信任存储
+sudo cp /tmp/minio.crt /usr/local/share/ca-certificates/minio.crt
+# 或对于 RustFS：
+sudo cp /tmp/rustfs.crt /usr/local/share/ca-certificates/rustfs.crt
+sudo update-ca-certificates
+
+# 步骤 3：验证证书已添加
+ls -la /etc/ssl/certs/ | grep minio
+# 或对于 RustFS：
+ls -la /etc/ssl/certs/ | grep rustfs
+
+# 从 S3 存储拉取 LFS 文件
+# Git LFS 会在您检出或拉取时自动下载 LFS 文件
+git checkout master
+# 或
+git pull origin master
+
+# 验证 LFS 文件已下载
+git lfs ls-files
+
+# 检查 LFS 文件状态
+git lfs status
+
+# 如果 LFS 文件未自动下载，请手动获取它们：
+git lfs fetch
+git lfs checkout
 ```
 
 ## 故障排除

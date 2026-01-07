@@ -868,6 +868,8 @@ For more information, refer to the [RustFS Documentation](https://docs.rustfs.co
 
 ## Usage
 
+### Cloning and Pushing LFS Files to S3 Storage
+
 ```bash
 # Clone repo
 git clone http://127.0.0.1:8080/a/test-repo
@@ -939,6 +941,72 @@ git push-lfs origin HEAD:refs/for/master
 # - For MinIO: check MinIO Console at http://localhost:9001
 # - For RustFS: check RustFS Console at http://localhost:9003
 git lfs ls-files
+```
+
+### Cloning and Pulling LFS Files from S3 Storage
+
+When cloning or pulling a repository that already contains LFS files stored in S3, you need to configure git-lfs to access the S3 storage backend:
+
+```bash
+# Clone a repository with LFS files
+git clone http://127.0.0.1:8080/a/test-repo
+cd test-repo
+
+# Configure LFS URL (required for LFS operations)
+git config lfs.url http://127.0.0.1:8080/a/test-repo/info/lfs
+
+# Store credentials for authentication
+git config credential.helper store
+
+# For Gerrit 2.13: Configure /etc/hosts mapping on client machine (REQUIRED)
+# This is needed because Gerrit 2.13 uses JGit LFS 4.5.0 which constructs
+# S3 endpoints from region instead of using configured hostname
+echo "YOUR_S3_SERVER_IP  your-domain.com s3-us-east-1.amazonaws.com" | sudo tee -a /etc/hosts
+
+# Configure git-lfs SSL verification for S3 endpoints
+# This is REQUIRED because git-lfs downloads directly from S3 using pre-signed URLs
+# and doesn't trust self-signed certificates or mismatched hostnames by default
+#
+# Option 1: Skip SSL verification (for testing or when using /etc/hosts mapping)
+export GIT_SSL_NO_VERIFY=1
+# OR
+export GIT_LFS_SKIP_SSL_VERIFY=1
+# OR
+git config lfs.https://s3-us-east-1.amazonaws.com/.sslverify false
+
+# Option 2: Add certificate to system trust store (RECOMMENDED for production)
+# Step 1: Copy certificate from S3 server to local machine
+# For MinIO:
+scp user@minio-server:/path/to/minio/certs/public.crt /tmp/minio.crt
+# For RustFS:
+scp user@rustfs-server:/path/to/rustfs/certs/public.crt /tmp/rustfs.crt
+
+# Step 2: Add certificate to system trust store
+sudo cp /tmp/minio.crt /usr/local/share/ca-certificates/minio.crt
+# OR for RustFS:
+sudo cp /tmp/rustfs.crt /usr/local/share/ca-certificates/rustfs.crt
+sudo update-ca-certificates
+
+# Step 3: Verify certificate was added
+ls -la /etc/ssl/certs/ | grep minio
+# OR for RustFS:
+ls -la /etc/ssl/certs/ | grep rustfs
+
+# Pull LFS files from S3 storage
+# Git LFS will automatically download LFS files when you checkout or pull
+git checkout master
+# OR
+git pull origin master
+
+# Verify LFS files were downloaded
+git lfs ls-files
+
+# Check LFS file status
+git lfs status
+
+# If LFS files are not automatically downloaded, manually fetch them:
+git lfs fetch
+git lfs checkout
 ```
 
 ## Troubleshooting
