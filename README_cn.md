@@ -879,11 +879,8 @@ mc du myrustfs/gerritlfs
 git clone http://127.0.0.1:8080/a/test-repo
 cd test-repo
 
-# 配置 LFS
-git config lfs.url http://127.0.0.1:8080/a/test-repo/info/lfs
-
 # 存储 credential (~/.git-credentials)
-git config credential.helper store
+git config --global credential.helper store
 
 # 对于自签名证书或自定义主机名（Gerrit 2.13），配置 git-lfs SSL 验证
 # 这是必需的，因为 git-lfs 使用预签名 URL 直接上传到 S3
@@ -904,7 +901,7 @@ scp user@rustfs-server:/path/to/rustfs/certs/public.crt /tmp/rustfs.crt
 # 选项 3：设置本地 git 别名用于推送时禁用 SSL 验证（推荐）
 # 这会在 .git/config 中创建本地别名（不是全局），因此仅影响此仓库
 # 注意：在 git-lfs 3.4+ 中，sslverify 配置可能不可靠，因此推荐使用带环境变量的别名
-git config alias.push-lfs '!GIT_SSL_NO_VERIFY=1 GIT_LFS_SKIP_SSL_VERIFY=1 git push'
+git config --global alias.push-lfs '!GIT_SSL_NO_VERIFY=1 GIT_LFS_SKIP_SSL_VERIFY=1 git push'
 
 # 步骤 2：将证书添加到系统信任存储
 sudo cp /tmp/minio.crt /usr/local/share/ca-certificates/minio.crt
@@ -922,6 +919,13 @@ echo "YOUR_S3_SERVER_IP  your-domain.com s3-us-east-1.amazonaws.com" | sudo tee 
 
 # 验证 LFS 已配置
 git ls-remote http://127.0.0.1:8080/a/test-repo
+
+# 在仓库中创建 .lfsconfig 文件（推荐）
+# 此文件会被提交到仓库中，并自动为所有用户配置 LFS URL
+# 当有人克隆仓库时，git-lfs 会自动使用 .lfsconfig 中的 URL
+# 这样就不需要每个用户手动配置 lfs.url
+git config -f .lfsconfig lfs.url http://127.0.0.1:8080/a/test-repo/info/lfs
+git add .lfsconfig
 
 # 跟踪将存储在 S3 后端（MinIO、RustFS 或 AWS S3）上的文件类型
 # 文件将存储在 S3 兼容的存储服务器上

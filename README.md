@@ -875,11 +875,8 @@ For more information, refer to the [RustFS Documentation](https://docs.rustfs.co
 git clone http://127.0.0.1:8080/a/test-repo
 cd test-repo
 
-# Configure LFS
-git config lfs.url http://127.0.0.1:8080/a/test-repo/info/lfs
-
 # Store credential (~/.git-credentials)
-git config credential.helper store
+git config --global credential.helper store
 
 # For self-signed certificates or custom hostname (Gerrit 2.13), configure git-lfs SSL verification
 # This is REQUIRED because git-lfs uploads directly to S3 using pre-signed URLs
@@ -900,7 +897,7 @@ scp user@rustfs-server:/path/to/rustfs/certs/public.crt /tmp/rustfs.crt
 # Option 3: Set up local git alias for push with SSL verification disabled (RECOMMENDED)
 # This creates a local alias in .git/config (not global), so it only affects this repository
 # Note: In git-lfs 3.4+, sslverify config may not work reliably, so using alias with env var is recommended
-git config alias.push-lfs '!GIT_SSL_NO_VERIFY=1 GIT_LFS_SKIP_SSL_VERIFY=1 git push'
+git config --global alias.push-lfs '!GIT_SSL_NO_VERIFY=1 GIT_LFS_SKIP_SSL_VERIFY=1 git push'
 
 # Step 2: Add certificate to system trust store
 sudo cp /tmp/minio.crt /usr/local/share/ca-certificates/minio.crt
@@ -918,6 +915,13 @@ echo "YOUR_S3_SERVER_IP  your-domain.com s3-us-east-1.amazonaws.com" | sudo tee 
 
 # Verify LFS is configured
 git ls-remote http://127.0.0.1:8080/a/test-repo
+
+# Create .lfsconfig file in repository (RECOMMENDED)
+# This file is committed to the repo and automatically configures LFS URL for all users
+# When someone clones the repo, git-lfs will automatically use the URL from .lfsconfig
+# This eliminates the need for each user to manually configure lfs.url
+git config -f .lfsconfig lfs.url http://127.0.0.1:8080/a/test-repo/info/lfs
+git add .lfsconfig
 
 # Trace file types that will be stored on S3 backend (MinIO, RustFS, or AWS S3)
 # Files will be stored on S3-compatible storage server
