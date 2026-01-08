@@ -79,7 +79,6 @@ config_git_lfs() {
                 if [ $? -eq 0 ]; then
                     git lfs install >/dev/null 2>&1
                     echo -e "${GREEN}DONE${NC}: git-lfs installed successfully"
-                    echo ""
                 else
                     echo -e "${RED}ERROR${NC}: Failed to install git-lfs"
                     cd /
