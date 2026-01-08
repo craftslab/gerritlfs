@@ -866,6 +866,79 @@ mc du myrustfs/gerritlfs
 
 For more information, refer to the [RustFS Documentation](https://docs.rustfs.com/).
 
+## Automated Setup Script
+
+### Using git-lfs.sh
+
+For easier setup and configuration, you can use the provided `git-lfs.sh` script to automate the Git LFS configuration process.
+
+**Features:**
+- Automated Git LFS installation and configuration
+- S3 certificate installation to system trust store
+- S3 host mapping configuration in `/etc/hosts`
+- Git aliases configuration for LFS operations with SSL verification disabled
+- Easy cleanup of all configurations
+
+**Usage:**
+
+```bash
+# Make the script executable
+chmod +x git-lfs.sh
+
+# Check current configuration status
+./git-lfs.sh check
+
+# Configure Git LFS (installs git-lfs, S3 certificate, host mapping, and git aliases)
+./git-lfs.sh config
+
+# Clean all configurations (removes git-lfs, certificates, host mappings, and aliases)
+./git-lfs.sh clean
+
+# Show version
+./git-lfs.sh version
+
+# Show help
+./git-lfs.sh help
+```
+
+**What `git-lfs.sh config` does:**
+
+1. **Install Git LFS:**
+   - Option 1: Install via apt (recommended)
+   - Option 2: Download from Artifactory
+
+2. **Configure S3 Certificate:**
+   - Downloads the S3 server certificate
+   - Installs it to `/usr/local/share/ca-certificates/`
+   - Updates system CA certificates
+
+3. **Configure S3 Host Mapping:**
+   - Adds S3 server IP and hostname mapping to `/etc/hosts`
+   - Supports custom S3 endpoints
+
+4. **Configure Git Aliases:**
+   - Sets up convenient git aliases with SSL verification disabled:
+     - `git push-lfs`: Push with LFS support
+     - `git clone-lfs`: Clone with LFS support
+     - `git fetch-lfs`: Fetch LFS objects
+     - `git checkout-lfs`: Checkout LFS files
+     - `git pull-lfs`: Pull with LFS support
+   - Configures credential helper to store credentials
+
+**Example Workflow:**
+
+```bash
+# 1. Configure environment
+./git-lfs.sh config
+
+# 2. Use git aliases for LFS operations
+git clone-lfs http://gerrit-server:8080/a/my-repo
+cd my-repo
+git push-lfs origin HEAD:refs/for/master
+```
+
+**Note:** The script automates the manual configuration steps described in the [Prerequisites](#prerequisites) and [Config](#config) sections. After running `./git-lfs.sh config`, you can skip the manual SSL certificate and `/etc/hosts` configuration steps.
+
 ## Usage
 
 ### Cloning and Pushing LFS Files to S3 Storage

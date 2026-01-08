@@ -870,6 +870,79 @@ mc du myrustfs/gerritlfs
 
 更多信息，请参考 [RustFS 文档](https://docs.rustfs.com/)。
 
+## 自动化设置脚本
+
+### 使用 git-lfs.sh
+
+为了更轻松地设置和配置，您可以使用提供的 `git-lfs.sh` 脚本来自动化 Git LFS 配置过程。
+
+**功能特性：**
+- 自动化 Git LFS 安装和配置
+- 将 S3 证书安装到系统信任存储
+- 在 `/etc/hosts` 中配置 S3 主机映射
+- 为 LFS 操作配置禁用 SSL 验证的 Git 别名
+- 轻松清理所有配置
+
+**使用方法：**
+
+```bash
+# 使脚本可执行
+chmod +x git-lfs.sh
+
+# 检查当前配置状态
+./git-lfs.sh check
+
+# 配置 Git LFS（安装 git-lfs、S3 证书、主机映射和 git 别名）
+./git-lfs.sh config
+
+# 清理所有配置（删除 git-lfs、证书、主机映射和别名）
+./git-lfs.sh clean
+
+# 显示版本
+./git-lfs.sh version
+
+# 显示帮助
+./git-lfs.sh help
+```
+
+**`git-lfs.sh config` 执行的操作：**
+
+1. **安装 Git LFS：**
+   - 选项 1：通过 apt 安装（推荐）
+   - 选项 2：从 Artifactory 下载
+
+2. **配置 S3 证书：**
+   - 下载 S3 服务器证书
+   - 将其安装到 `/usr/local/share/ca-certificates/`
+   - 更新系统 CA 证书
+
+3. **配置 S3 主机映射：**
+   - 将 S3 服务器 IP 和主机名映射添加到 `/etc/hosts`
+   - 支持自定义 S3 端点
+
+4. **配置 Git 别名：**
+   - 设置便捷的 git 别名，禁用 SSL 验证：
+     - `git push-lfs`：支持 LFS 的推送
+     - `git clone-lfs`：支持 LFS 的克隆
+     - `git fetch-lfs`：获取 LFS 对象
+     - `git checkout-lfs`：检出 LFS 文件
+     - `git pull-lfs`：支持 LFS 的拉取
+   - 配置凭据助手以存储凭据
+
+**示例工作流：**
+
+```bash
+# 1. 配置环境
+./git-lfs.sh config
+
+# 2. 使用 git 别名进行 LFS 操作
+git clone-lfs http://gerrit-server:8080/a/my-repo
+cd my-repo
+git push-lfs origin HEAD:refs/for/master
+```
+
+**注意：** 该脚本自动化了[前置要求](#前置要求)和[配置](#配置)部分中描述的手动配置步骤。运行 `./git-lfs.sh config` 后，您可以跳过手动 SSL 证书和 `/etc/hosts` 配置步骤。
+
 ## 使用
 
 ### 克隆和推送 LFS 文件至 S3 存储
