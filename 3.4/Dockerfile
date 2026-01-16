@@ -54,9 +54,10 @@ RUN chown -R builder:builder /workspace/gerrit
 
 # Initialize plugin as separate git repo to use VERSION file instead of parent repo's git describe
 RUN cd /workspace/gerrit/plugins/lfs \
+    && git config --global user.email "builder@localhost" \
+    && git config --global user.name "Builder" \
+    && git config --global --add safe.directory /workspace/gerrit/plugins/lfs \
     && git init \
-    && git config user.email "builder@localhost" \
-    && git config user.name "Builder" \
     && git add . \
     && git commit -m "lfs plugin" \
     && PLUGIN_VERSION=$(grep PLUGIN_VERSION VERSION | cut -d"'" -f2) \
