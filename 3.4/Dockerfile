@@ -45,12 +45,23 @@ RUN useradd -m -s /bin/bash builder \
     && chown -R builder:builder /workspace
 
 # Clone Gerrit
-RUN git clone https://gerrit.googlesource.com/gerrit -b stable-3.2 \
+RUN git clone https://gerrit.googlesource.com/gerrit -b stable-3.4 \
     && chown -R builder:builder /workspace/gerrit
 
 # Copy plugin source
 COPY lfs /workspace/gerrit/plugins/lfs
 RUN chown -R builder:builder /workspace/gerrit
+
+# Initialize plugin as separate git repo to use VERSION file instead of parent repo's git describe
+RUN cd /workspace/gerrit/plugins/lfs \
+    && git init \
+    && git config user.email "builder@localhost" \
+    && git config user.name "Builder" \
+    && git add . \
+    && git commit -m "lfs plugin" \
+    && PLUGIN_VERSION=$(grep PLUGIN_VERSION VERSION | cut -d"'" -f2) \
+    && git tag -a "v${PLUGIN_VERSION}" -m "lfs plugin v${PLUGIN_VERSION}" \
+    && chown -R builder:builder /workspace/gerrit/plugins/lfs
 
 # Initialize Gerrit submodules
 RUN git config --global --add safe.directory '*' \
