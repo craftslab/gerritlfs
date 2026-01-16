@@ -17,9 +17,6 @@ package com.googlesource.gerrit.plugins.lfs;
 import static com.googlesource.gerrit.plugins.lfs.LfsApiServlet.LFS_OBJECTS_REGEX_REST;
 import static com.googlesource.gerrit.plugins.lfs.locks.LfsLocksServlet.LFS_LOCKS_REGEX_REST;
 
-import com.google.gerrit.extensions.registration.DynamicSet;
-import com.google.gerrit.extensions.webui.JavaScriptPlugin;
-import com.google.gerrit.extensions.webui.WebUiPlugin;
 import com.google.inject.Inject;
 import com.google.inject.servlet.ServletModule;
 import com.googlesource.gerrit.plugins.lfs.fs.LfsFsContentServlet;
@@ -61,8 +58,6 @@ public class HttpModule extends ServletModule {
     for (LfsBackend backend : backends.values()) {
       populateRepository(backend);
     }
-
-    DynamicSet.bind(binder(), WebUiPlugin.class).toInstance(new JavaScriptPlugin("gr-lfs.js"));
   }
 
   private void populateRepository(LfsBackend backend) {
