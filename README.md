@@ -5,7 +5,7 @@
 ## Overview
 
 - [2.13](https://github.com/craftslab/gerritlfs/tree/main/2.13) - Gerrit 2.13 version build files
-- [3.2](https://github.com/craftslab/gerritlfs/tree/main/3.2) - Gerrit 3.2 version build files
+- [3.4](https://github.com/craftslab/gerritlfs/tree/main/3.4) - Gerrit 3.4 version build files
 
 ## Prerequisites
 
@@ -60,28 +60,28 @@ You should see output like `git-lfs/3.x.x`.
 
 The LFS plugin must be built and installed on your Gerrit server before it can be used. Choose the build method based on your Gerrit version:
 
-#### For Gerrit 3.2
+#### For Gerrit 3.4
 
 1. **Build the plugin using Docker:**
 
 ```bash
-cd 3.2
+cd 3.4
 ./build.sh
 ```
 
-This will create a Docker image `gerrit-plugins-lfs:3.2` containing the built plugin.
+This will create a Docker image `gerrit-plugins-lfs:3.4` containing the built plugin.
 
 2. **Extract the lfs.jar from the Docker container:**
 
 ```bash
-# Create a temporary container from the image
-docker create --name temp-container gerrit-plugins-lfs:3.2
+# Run the container to build the plugin
+docker run --name gerrit-plugins-lfs gerrit-plugins-lfs:3.4
 
 # Copy the lfs.jar from the container
-docker cp temp-container:/workspace/output/lfs.jar ./lfs.jar
+docker cp gerrit-plugins-lfs:/workspace/output/lfs.jar ./lfs.jar
 
-# Remove the temporary container
-docker rm temp-container
+# Remove the container
+docker rm gerrit-plugins-lfs
 ```
 
 #### For Gerrit 2.13
@@ -98,14 +98,14 @@ This will create a Docker image `gerrit-plugins-lfs:2.13` containing the built p
 2. **Extract the lfs.jar from the Docker container:**
 
 ```bash
-# Create a temporary container from the image
-docker create --name temp-container gerrit-plugins-lfs:2.13
+# Run the container to build the plugin
+docker run --name gerrit-plugins-lfs gerrit-plugins-lfs:2.13
 
 # Copy the lfs.jar from the container
-docker cp temp-container:/workspace/gerrit/plugins/lfs/lfs.jar ./lfs.jar
+docker cp gerrit-plugins-lfs:/workspace/lfs-2.13/buck-out/gen/lfs.jar ./lfs.jar
 
-# Remove the temporary container
-docker rm temp-container
+# Remove the container
+docker rm gerrit-plugins-lfs
 ```
 
 ### Install the Plugin on Gerrit Server

@@ -5,7 +5,7 @@
 ## 概述
 
 - [2.13](https://github.com/craftslab/gerritlfs/tree/main/2.13) - Gerrit 2.13 版本构建文件
-- [3.2](https://github.com/craftslab/gerritlfs/tree/main/3.2) - Gerrit 3.2 版本构建文件
+- [3.4](https://github.com/craftslab/gerritlfs/tree/main/3.4) - Gerrit 3.4 版本构建文件
 
 ## 前置要求
 
@@ -60,28 +60,28 @@ git lfs version
 
 LFS 插件必须构建并安装在您的 Gerrit 服务器上才能使用。根据您的 Gerrit 版本选择构建方法：
 
-#### 对于 Gerrit 3.2
+#### 对于 Gerrit 3.4
 
 1. **使用 Docker 构建插件：**
 
 ```bash
-cd 3.2
+cd 3.4
 ./build.sh
 ```
 
-这将创建一个包含已构建插件的 Docker 镜像 `gerrit-plugins-lfs:3.2`。
+这将创建一个包含已构建插件的 Docker 镜像 `gerrit-plugins-lfs:3.4`。
 
 2. **从 Docker 容器中提取 lfs.jar：**
 
 ```bash
-# 从镜像创建临时容器
-docker create --name temp-container gerrit-plugins-lfs:3.2
+# 运行容器以构建插件
+docker run --name gerrit-plugins-lfs gerrit-plugins-lfs:3.4
 
 # 从容器复制 lfs.jar
-docker cp temp-container:/workspace/output/lfs.jar ./lfs.jar
+docker cp gerrit-plugins-lfs:/workspace/output/lfs.jar ./lfs.jar
 
-# 删除临时容器
-docker rm temp-container
+# 删除容器
+docker rm gerrit-plugins-lfs
 ```
 
 #### 对于 Gerrit 2.13
@@ -98,18 +98,14 @@ cd 2.13
 2. **从 Docker 容器中提取 lfs.jar：**
 
 ```bash
-# 从镜像创建临时容器
-docker create --name temp-container gerrit-plugins-lfs:2.13
+# 运行容器以构建插件
+docker run --name gerrit-plugins-lfs gerrit-plugins-lfs:2.13
 
 # 从容器复制 lfs.jar
-# 注意：对于 2.13，JAR 位置可能不同。检查容器：
-docker cp temp-container:/workspace/gerrit/plugins/lfs/lfs.jar ./lfs.jar
+docker cp gerrit-plugins-lfs:/workspace/lfs-2.13/buck-out/gen/lfs.jar ./lfs.jar
 
-# 或者如果使用 Buck 构建：
-docker cp temp-container:/workspace/gerrit/buck-out/gen/plugins/lfs/lfs.jar ./lfs.jar
-
-# 删除临时容器
-docker rm temp-container
+# 删除容器
+docker rm gerrit-plugins-lfs
 ```
 
 ### 在 Gerrit 服务器上安装插件
