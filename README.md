@@ -939,6 +939,172 @@ git push-lfs origin HEAD:refs/for/master
 
 **Note:** The script automates the manual configuration steps described in the [Prerequisites](#prerequisites) and [Config](#config) sections. After running `./git-lfs.sh config`, you can skip the manual SSL certificate and `/etc/hosts` configuration steps.
 
+### Using migrate.sh
+
+For migrating Git LFS repositories and syncing S3 bucket data between source and destination, you can use the provided `migrate.sh` script.
+
+**Features:**
+- Clone or fetch Git LFS repositories with support for specific commit dates
+- Download S3 bucket data from source storage server
+- Upload S3 bucket data to destination storage server
+- Push repository and LFS objects to destination repository
+- Filter S3 objects by commit date to download only relevant LFS files
+- Support for incremental migrations and partial operations
+
+**Prerequisites:**
+- `git` - Git version control
+- `git-lfs` - Git LFS extension
+- `aws-cli` - AWS CLI for S3 operations
+
+Install on Ubuntu:
+```bash
+sudo apt-get install git git-lfs awscli
+```
+
+**Usage:**
+
+```bash
+# Make the script executable
+chmod +x migrate.sh
+
+# Configure migration settings (interactive)
+./migrate.sh config
+
+# Perform full migration (clone/fetch, download S3, upload S3, push)
+./migrate.sh migrate
+
+# Clone or fetch source repository only
+./migrate.sh clone
+
+# Download S3 bucket data from source only
+./migrate.sh fetch-s3
+
+# Upload S3 bucket data to destination only
+./migrate.sh upload-s3
+
+# Push repository to destination only
+./migrate.sh push
+
+# Check dependencies and configuration
+./migrate.sh check
+
+# Show version
+./migrate.sh version
+
+# Show help
+./migrate.sh help
+```
+
+**Configuration:**
+
+The script uses an interactive configuration wizard or you can edit the configuration file directly:
+
+```bash
+# Interactive configuration
+./migrate.sh config
+```
+
+Configuration is saved to `~/.git-lfs-migrate.conf`. You can also edit this file directly:
+
+```bash
+# Source Git Repository
+SOURCE_GIT_URL="http://source-gerrit:8080/a/my-repo"
+SOURCE_GIT_BRANCH="master"
+SOURCE_COMMIT_HASH=""  # Optional: specific commit hash
+SOURCE_COMMIT_DATE=""   # Optional: date string (e.g., "2024-01-01" or "2024-01-01 12:00:00")
+
+# Source S3 Configuration
+SOURCE_S3_ENDPOINT="https://source-s3.example.com"
+SOURCE_S3_BUCKET="gerritlfs"
+SOURCE_S3_ACCESS_KEY="your-access-key"
+SOURCE_S3_SECRET_KEY="your-secret-key"
+SOURCE_S3_REGION="us-east-1"
+
+# Destination Git Repository
+DEST_GIT_URL="http://dest-gerrit:8080/a/my-repo"
+DEST_GIT_BRANCH="master"
+
+# Destination S3 Configuration
+DEST_S3_ENDPOINT="https://dest-s3.example.com"
+DEST_S3_BUCKET="gerritlfs"
+DEST_S3_ACCESS_KEY="your-access-key"
+DEST_S3_SECRET_KEY="your-secret-key"
+DEST_S3_REGION="us-east-1"
+
+# Migration Options
+WORK_DIR="/tmp/git-lfs-migrate"
+SKIP_S3_SYNC="false"
+SKIP_GIT_PUSH="false"
+```
+
+**Commit Date Support:**
+
+You can specify a specific commit date or hash to migrate a repository at a specific point in time:
+
+```bash
+# Configure with commit date
+./migrate.sh config
+# When prompted, enter:
+# Source Commit Hash: (optional, e.g., abc123def)
+# Source Commit Date: 2024-01-01
+
+# Or set in config file:
+SOURCE_COMMIT_DATE="2024-01-01"
+SOURCE_COMMIT_HASH="abc123def"
+```
+
+When a commit date is specified:
+- The repository is checked out to the commit at or before that date
+- Only LFS objects referenced by that commit are downloaded from S3
+- This allows for time-based migrations and reduces download size
+
+**Example Workflow:**
+
+```bash
+# 1. Configure migration settings
+./migrate.sh config
+
+# 2. Perform full migration
+./migrate.sh migrate
+
+# Or perform step by step:
+# 2a. Clone source repository
+./migrate.sh clone
+
+# 2b. Download S3 bucket data
+./migrate.sh fetch-s3
+
+# 2c. Upload S3 bucket data to destination
+./migrate.sh upload-s3
+
+# 2d. Push to destination repository
+./migrate.sh push
+```
+
+**Migration with Specific Commit Date:**
+
+```bash
+# Configure with commit date
+./migrate.sh config
+# Enter commit date: 2024-01-01
+
+# Perform migration - only downloads LFS objects for that commit
+./migrate.sh migrate
+```
+
+**Environment Variables:**
+
+You can also set environment variables to override configuration:
+
+```bash
+export GIT_SSL_NO_VERIFY=1          # Skip SSL verification for Git operations
+export GIT_LFS_SKIP_SSL_VERIFY=1    # Skip SSL verification for Git LFS operations
+export AWS_ACCESS_KEY_ID="..."       # AWS access key (if not in config)
+export AWS_SECRET_ACCESS_KEY="..."  # AWS secret key (if not in config)
+```
+
+**Note:** The script handles SSL verification skipping automatically for self-signed certificates and supports both direct S3 access and S3-compatible storage servers (MinIO, RustFS, etc.).
+
 ## Usage
 
 ### Cloning and Pushing LFS Files to S3 Storage

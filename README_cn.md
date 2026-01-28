@@ -939,6 +939,172 @@ git push-lfs origin HEAD:refs/for/master
 
 **注意：** 该脚本自动化了[前置要求](#前置要求)和[配置](#配置)部分中描述的手动配置步骤。运行 `./git-lfs.sh config` 后，您可以跳过手动 SSL 证书和 `/etc/hosts` 配置步骤。
 
+### 使用 migrate.sh
+
+用于在源和目标之间迁移 Git LFS 仓库并同步 S3 存储桶数据，您可以使用提供的 `migrate.sh` 脚本。
+
+**功能特性：**
+- 克隆或获取 Git LFS 仓库，支持特定提交日期
+- 从源存储服务器下载 S3 存储桶数据
+- 将 S3 存储桶数据上传到目标存储服务器
+- 将仓库和 LFS 对象推送到目标仓库
+- 按提交日期过滤 S3 对象，仅下载相关的 LFS 文件
+- 支持增量迁移和部分操作
+
+**前置要求：**
+- `git` - Git 版本控制
+- `git-lfs` - Git LFS 扩展
+- `aws-cli` - 用于 S3 操作的 AWS CLI
+
+在 Ubuntu 上安装：
+```bash
+sudo apt-get install git git-lfs awscli
+```
+
+**使用方法：**
+
+```bash
+# 使脚本可执行
+chmod +x migrate.sh
+
+# 配置迁移设置（交互式）
+./migrate.sh config
+
+# 执行完整迁移（克隆/获取、下载 S3、上传 S3、推送）
+./migrate.sh migrate
+
+# 仅克隆或获取源仓库
+./migrate.sh clone
+
+# 仅从源下载 S3 存储桶数据
+./migrate.sh fetch-s3
+
+# 仅将 S3 存储桶数据上传到目标
+./migrate.sh upload-s3
+
+# 仅将仓库推送到目标
+./migrate.sh push
+
+# 检查依赖项和配置
+./migrate.sh check
+
+# 显示版本
+./migrate.sh version
+
+# 显示帮助
+./migrate.sh help
+```
+
+**配置：**
+
+脚本使用交互式配置向导，或者您可以直接编辑配置文件：
+
+```bash
+# 交互式配置
+./migrate.sh config
+```
+
+配置保存在 `~/.git-lfs-migrate.conf`。您也可以直接编辑此文件：
+
+```bash
+# 源 Git 仓库
+SOURCE_GIT_URL="http://source-gerrit:8080/a/my-repo"
+SOURCE_GIT_BRANCH="master"
+SOURCE_COMMIT_HASH=""  # 可选：特定提交哈希
+SOURCE_COMMIT_DATE=""   # 可选：日期字符串（例如："2024-01-01" 或 "2024-01-01 12:00:00"）
+
+# 源 S3 配置
+SOURCE_S3_ENDPOINT="https://source-s3.example.com"
+SOURCE_S3_BUCKET="gerritlfs"
+SOURCE_S3_ACCESS_KEY="your-access-key"
+SOURCE_S3_SECRET_KEY="your-secret-key"
+SOURCE_S3_REGION="us-east-1"
+
+# 目标 Git 仓库
+DEST_GIT_URL="http://dest-gerrit:8080/a/my-repo"
+DEST_GIT_BRANCH="master"
+
+# 目标 S3 配置
+DEST_S3_ENDPOINT="https://dest-s3.example.com"
+DEST_S3_BUCKET="gerritlfs"
+DEST_S3_ACCESS_KEY="your-access-key"
+DEST_S3_SECRET_KEY="your-secret-key"
+DEST_S3_REGION="us-east-1"
+
+# 迁移选项
+WORK_DIR="/tmp/git-lfs-migrate"
+SKIP_S3_SYNC="false"
+SKIP_GIT_PUSH="false"
+```
+
+**提交日期支持：**
+
+您可以指定特定的提交日期或哈希值，以在特定时间点迁移仓库：
+
+```bash
+# 使用提交日期配置
+./migrate.sh config
+# 提示时输入：
+# Source Commit Hash: （可选，例如：abc123def）
+# Source Commit Date: 2024-01-01
+
+# 或在配置文件中设置：
+SOURCE_COMMIT_DATE="2024-01-01"
+SOURCE_COMMIT_HASH="abc123def"
+```
+
+当指定提交日期时：
+- 仓库将检出到该日期或之前的提交
+- 仅下载该提交引用的 LFS 对象
+- 这允许基于时间的迁移并减少下载大小
+
+**示例工作流：**
+
+```bash
+# 1. 配置迁移设置
+./migrate.sh config
+
+# 2. 执行完整迁移
+./migrate.sh migrate
+
+# 或分步执行：
+# 2a. 克隆源仓库
+./migrate.sh clone
+
+# 2b. 下载 S3 存储桶数据
+./migrate.sh fetch-s3
+
+# 2c. 将 S3 存储桶数据上传到目标
+./migrate.sh upload-s3
+
+# 2d. 推送到目标仓库
+./migrate.sh push
+```
+
+**使用特定提交日期进行迁移：**
+
+```bash
+# 使用提交日期配置
+./migrate.sh config
+# 输入提交日期：2024-01-01
+
+# 执行迁移 - 仅下载该提交的 LFS 对象
+./migrate.sh migrate
+```
+
+**环境变量：**
+
+您还可以设置环境变量来覆盖配置：
+
+```bash
+export GIT_SSL_NO_VERIFY=1          # 跳过 Git 操作的 SSL 验证
+export GIT_LFS_SKIP_SSL_VERIFY=1    # 跳过 Git LFS 操作的 SSL 验证
+export AWS_ACCESS_KEY_ID="..."       # AWS 访问密钥（如果不在配置中）
+export AWS_SECRET_ACCESS_KEY="..."  # AWS 密钥（如果不在配置中）
+```
+
+**注意：** 脚本会自动处理自签名证书的 SSL 验证跳过，并支持直接 S3 访问和 S3 兼容的存储服务器（MinIO、RustFS 等）。
+
 ## 使用
 
 ### 克隆和推送 LFS 文件至 S3 存储
