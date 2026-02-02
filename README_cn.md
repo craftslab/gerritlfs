@@ -958,7 +958,22 @@ git push-lfs origin HEAD:refs/for/master
 
 在 Ubuntu 上安装：
 ```bash
-sudo apt-get install git git-lfs awscli
+# Git 和 Git LFS（所有 Ubuntu 版本）
+sudo apt-get update
+sudo apt-get install git git-lfs
+
+# AWS CLI - 任选一种方式（Ubuntu 24.04+ 默认 apt 源中无 awscli）：
+# 方式 1：Snap（推荐用于 Ubuntu 24.04）
+sudo snap install aws-cli --classic
+
+# 方式 2：apt（Ubuntu 22.04 及更早版本）
+sudo apt-get install awscli
+
+# 方式 3：官方 AWS 安装程序（适用于所有版本）
+curl -s "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o /tmp/awscliv2.zip
+unzip -o /tmp/awscliv2.zip -d /tmp
+sudo /tmp/aws/install
+rm -rf /tmp/aws /tmp/awscliv2.zip
 ```
 
 **使用方法：**

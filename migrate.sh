@@ -45,7 +45,10 @@ check_dependencies() {
                     echo -e "   - git-lfs: sudo apt-get install git-lfs"
                     ;;
                 "aws-cli")
-                    echo -e "   - aws-cli: sudo apt-get install awscli"
+                    echo -e "   - aws-cli: Install via one of the following (Ubuntu 24.04 has no apt awscli):"
+                    echo -e "     Option 1 (Snap): sudo snap install aws-cli --classic"
+                    echo -e "     Option 2 (apt, if available): sudo apt-get install awscli"
+                    echo -e "     Option 3 (Official installer): curl -s https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip -o /tmp/awscliv2.zip && (cd /tmp && unzip -o awscliv2.zip && sudo ./aws/install)"
                     ;;
             esac
         done

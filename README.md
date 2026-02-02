@@ -958,7 +958,22 @@ For migrating Git LFS repositories and syncing S3 bucket data between source and
 
 Install on Ubuntu:
 ```bash
-sudo apt-get install git git-lfs awscli
+# Git and Git LFS (all Ubuntu versions)
+sudo apt-get update
+sudo apt-get install git git-lfs
+
+# AWS CLI - choose one method (Ubuntu 24.04+ does not have awscli in default apt repos):
+# Option 1: Snap (recommended for Ubuntu 24.04)
+sudo snap install aws-cli --classic
+
+# Option 2: apt (Ubuntu 22.04 and earlier)
+sudo apt-get install awscli
+
+# Option 3: Official AWS installer (all versions)
+curl -s "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o /tmp/awscliv2.zip
+unzip -o /tmp/awscliv2.zip -d /tmp
+sudo /tmp/aws/install
+rm -rf /tmp/aws /tmp/awscliv2.zip
 ```
 
 **Usage:**
