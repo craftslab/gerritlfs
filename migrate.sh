@@ -527,17 +527,23 @@ upload_s3_data() {
 }
 
 # Push to destination repository
+# $1=dest_url, $2=branch, $3=work_dir, $4=repo_dir_name (optional; default: basename of dest_url)
+# The cloned repo lives in work_dir/repo_dir_name; repo_dir_name is from SOURCE_GIT_URL (clone source).
 push_to_dest() {
     local repo_url="$1"
     local branch="$2"
     local work_dir="$3"
-    local repo_name=$(basename "$repo_url" .git)
-    local repo_dir="${work_dir}/${repo_name}"
+    local repo_dir_name="${4:-}"
+    if [ -z "$repo_dir_name" ]; then
+        repo_dir_name=$(basename "$repo_url" .git)
+    fi
+    local repo_dir="${work_dir}/${repo_dir_name}"
 
     echo -e "${BLUE}INFO${NC}: Pushing to destination repository: ${repo_url}"
 
     if [ ! -d "$repo_dir" ]; then
         echo -e "${RED}ERROR${NC}: Repository directory not found: ${repo_dir}"
+        echo -e "${BLUE}INFO${NC}: The clone is under the source repo name. Run '$0 clone' first if needed."
         return 1
     fi
 
@@ -670,7 +676,7 @@ perform_migration() {
     if [ "${SKIP_GIT_PUSH:-false}" != "true" ]; then
         echo ""
         echo -e "${BLUE}=== Step 4: Push to Destination Repository ===${NC}"
-        if ! push_to_dest "$DEST_GIT_URL" "${DEST_GIT_BRANCH:-master}" "$WORK_DIR"; then
+        if ! push_to_dest "$DEST_GIT_URL" "${DEST_GIT_BRANCH:-master}" "$WORK_DIR" "$(basename "$SOURCE_GIT_URL" .git)"; then
             echo -e "${RED}ERROR${NC}: Failed to push to destination repository"
             return 1
         fi
@@ -822,7 +828,7 @@ main() {
                 exit 1
             fi
             WORK_DIR="${WORK_DIR:-/tmp/git-lfs-migrate}"
-            push_to_dest "$DEST_GIT_URL" "${DEST_GIT_BRANCH:-master}" "$WORK_DIR"
+            push_to_dest "$DEST_GIT_URL" "${DEST_GIT_BRANCH:-master}" "$WORK_DIR" "$(basename "$SOURCE_GIT_URL" .git)"
             ;;
         check)
             check_dependencies
