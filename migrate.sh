@@ -5,7 +5,7 @@
 # between source and destination repositories and S3 storage servers
 
 # Script version
-SCRIPT_VERSION="1.0.0-rc1"
+SCRIPT_VERSION="1.0.0"
 
 # Terminal colors
 RED='\033[0;31m'
